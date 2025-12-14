@@ -8,13 +8,13 @@ export default function Layout({ children }) {
       className="background"
       style={{ backgroundImage: `url(${bg})` }}
     >
-      {/* Header SIEMPRE fuera del overlay */}
       <Header />
 
-      {/* Overlay para oscurecer el fondo y centrar contenido */}
       <div className="overlay">
-        <div className="page-content">
-          {children}
+        <div className="app-layout">
+          <main className="app-content">
+            {children}
+          </main>
         </div>
       </div>
     </div>

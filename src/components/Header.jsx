@@ -8,11 +8,11 @@ export default function Header() {
       <h2 className="logo">POOLINI</h2>
 
       <nav className="nav">
-        <Link to="/" className="nav-btn">🏠 Inicio</Link>
-        <Link to="/partida/nueva" className="nav-btn">🎱 Nueva</Link>
-        <Link to="/jugadores" className="nav-btn">👤 Jugadores</Link>
-        <Link to="/historial" className="nav-btn">📜 Historial</Link>
-        <Link to="/clips" className="nav-btn">🎬 Clips</Link>
+          <Link to="/clips" className="icon-btn">🎬</Link>
+          <Link to="/" className="icon-btn">🏠</Link>
+          <Link to="/partida/nueva" className="icon-btn">🎱</Link>
+          <Link to="/historial" className="icon-btn">📊</Link>
+          <Link to="/jugadores" className="icon-btn">👤</Link>
       </nav>
 
     </header>

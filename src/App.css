@@ -136,3 +136,41 @@
   font-size: 1.2rem;
   cursor: pointer;
 }
+
+/* === LAYOUT GENERAL === */
+
+.background {
+  min-height: 100vh;
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed; /* fondo fijo */
+}
+
+.overlay {
+  min-height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* contenedor principal */
+.app-layout {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+/* contenido */
+.app-content {
+  width: 100%;
+  max-width: 900px;
+  padding: 24px;
+  color: white;
+
+  overflow-x: hidden;
+}
+
+/* mobile spacing para navbar inferior */
+@media (max-width: 768px) {
+  .app-content {
+    padding-bottom: 90px;
+  }
+}
