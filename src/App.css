@@ -8,16 +8,12 @@
   overflow: hidden;
 }
 
+/* overlay oscuro */
 .overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: relative;
+  min-height: 100vh;
   background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  z-index: 1;
 }
 
 .page-content {
@@ -151,11 +147,10 @@
   background: rgba(0, 0, 0, 0.65);
 }
 
-/* contenedor principal */
+/* layout */
 .app-layout {
   display: flex;
   justify-content: center;
-  width: 100%;
 }
 
 /* contenido */
@@ -164,13 +159,33 @@
   max-width: 900px;
   padding: 24px;
   color: white;
-
-  overflow-x: hidden;
 }
 
-/* mobile spacing para navbar inferior */
+/* espacio para bottom bar */
 @media (max-width: 768px) {
   .app-content {
     padding-bottom: 90px;
   }
+}
+
+/* raíz */
+.app-root {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* fondo fijo REAL (funciona en mobile) */
+.fixed-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  z-index: -2;
 }
