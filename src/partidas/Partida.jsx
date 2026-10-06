@@ -1,58 +1,111 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useMatches } from "../context/MatchContext";
-import { usePlayers } from "../context/PlayerContext";
 import { useState, useEffect } from "react";
+import QRCode from "react-qr-code";
+import { getMatchById } from "../services/MatchService";
+import { supabase } from "../supabaseClient";
+import "./Partida.css";
 
 export default function Partida() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { matches, finishMatch } = useMatches();
-  const { players } = usePlayers();
-
   const [match, setMatch] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Buscar esta partida dentro de las que ya cargó el contexto
+  const controlUrl = `${window.location.origin}/partida/${id}/control`;
+
+  // Carga inicial
   useEffect(() => {
-    const m = matches.find((x) => x.id === id);
-    setMatch(m);
-  }, [matches, id]);
+    getMatchById(id)
+      .then(setMatch)
+      .finally(() => setLoading(false));
+  }, [id]);
 
-  function getPlayerName(uid) {
-    return players.find((p) => p.id === uid)?.name || "Desconocido";
-  }
+  // Suscripción Realtime — actualiza marcador y estado automáticamente
+  useEffect(() => {
+    const channel = supabase
+      .channel(`match-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${id}` },
+        (payload) => {
+          setMatch((prev) => ({ ...prev, ...payload.new }));
+        }
+      )
+      .subscribe();
 
-  if (!match) return <p>Cargando partida...</p>;
+    return () => supabase.removeChannel(channel);
+  }, [id]);
 
-  const p1 = getPlayerName(match.player1_id || match.player1);
-  const p2 = getPlayerName(match.player2_id || match.player2);
+  if (loading) return <p className="loading-text">Cargando partida...</p>;
+  if (!match)  return <p className="loading-text">Partida no encontrada.</p>;
 
-  async function handleWinner(winnerId) {
-    await finishMatch(match.id, winnerId);
-    navigate("/historial");
-  }
+  const p1 = match.player1;
+  const p2 = match.player2;
+  const finished = match.status === "finished";
 
   return (
-    <div className="page-content">
-      <h1>Partida</h1>
+    <div className="partida-pc">
+      {/* Encabezado */}
+      <div className="partida-header">
+        <h1 className="partida-title">
+          {p1?.name ?? "Jugador 1"} <span className="vs">vs</span> {p2?.name ?? "Jugador 2"}
+        </h1>
+        <span className={`partida-status ${finished ? "status-finished" : "status-active"}`}>
+          {finished ? "FINALIZADA" : "EN CURSO"}
+        </span>
+      </div>
 
-      <h2>{p1} vs {p2}</h2>
+      <div className="partida-body">
+        {/* Marcador */}
+        <div className="score-board">
+          <div className="score-side">
+            {p1?.avatar_url && (
+              <img src={p1.avatar_url} alt={p1.name} className="score-avatar" />
+            )}
+            <span className="score-name">{p1?.name ?? "J1"}</span>
+            <span className="score-number">{match.score1 ?? 0}</span>
+          </div>
 
-      {match.winner_id || match.winner ? (
-        <h3>Ganador: {getPlayerName(match.winner_id || match.winner)}</h3>
-      ) : (
-        <>
-          <h3>Seleccionar ganador:</h3>
+          <div className="score-divider">:</div>
 
-          <button className="btn" onClick={() => handleWinner(match.player1_id || match.player1)}>
-            {p1}
-          </button>
+          <div className="score-side">
+            {p2?.avatar_url && (
+              <img src={p2.avatar_url} alt={p2.name} className="score-avatar" />
+            )}
+            <span className="score-name">{p2?.name ?? "J2"}</span>
+            <span className="score-number">{match.score2 ?? 0}</span>
+          </div>
+        </div>
 
-          <button className="btn" onClick={() => handleWinner(match.player2_id || match.player2)}>
-            {p2}
-          </button>
-        </>
-      )}
+        {/* QR */}
+        {!finished && (
+          <div className="qr-section">
+            <p className="qr-label">Escaneá para controlar desde el celular</p>
+            <div className="qr-wrapper">
+              <QRCode
+                value={controlUrl}
+                size={180}
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
+            </div>
+            <p className="qr-url">{controlUrl}</p>
+          </div>
+        )}
+
+        {/* Ganador */}
+        {finished && match.winner_id && (
+          <div className="winner-banner">
+            🏆 Ganador:{" "}
+            {match.winner_id === p1?.id ? p1?.name : p2?.name}
+          </div>
+        )}
+      </div>
+
+      <button className="btn back-btn" onClick={() => navigate("/historial")}>
+        ← Volver al historial
+      </button>
     </div>
   );
 }

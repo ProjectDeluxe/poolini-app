@@ -1,0 +1,212 @@
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 60px);
+  padding: 24px;
+}
+
+.login-card {
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 40px 32px;
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+
+.login-logo {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+.login-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: 4px;
+  margin: 0 0 8px 0;
+}
+
+.login-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  margin: 0 0 28px 0;
+  line-height: 1.5;
+}
+
+.login-subtitle strong {
+  color: white;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Fila teléfono */
+.phone-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.country-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  padding: 12px 8px;
+  cursor: pointer;
+  min-width: 100px;
+}
+
+.country-select option {
+  background: #1a1a1a;
+  color: white;
+}
+
+.phone-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.phone-input:focus {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.phone-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* OTP input */
+.otp-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 2rem;
+  letter-spacing: 12px;
+  padding: 16px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.otp-input:focus {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.otp-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 8px;
+}
+
+/* Botón principal */
+.login-btn {
+  background: white;
+  border: none;
+  border-radius: 8px;
+  color: black;
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  padding: 14px;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.login-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.login-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Volver */
+.login-back {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px;
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.login-back:hover {
+  color: white;
+}
+
+/* Dev bypass */
+.dev-section {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dev-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 180, 0, 0.4);
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+}
+
+.dev-divider::before,
+.dev-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 180, 0, 0.2);
+}
+
+.dev-btn {
+  background: transparent;
+  border: 1px dashed rgba(255, 180, 0, 0.35);
+  border-radius: 8px;
+  color: rgba(255, 180, 0, 0.7);
+  cursor: pointer;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 1px;
+  padding: 12px;
+  transition: 0.2s;
+  width: 100%;
+}
+
+.dev-btn:hover {
+  background: rgba(255, 180, 0, 0.08);
+  color: rgba(255, 180, 0, 0.95);
+  border-color: rgba(255, 180, 0, 0.6);
+}
+
+/* Error */
+.login-error {
+  color: #ff5c5c;
+  font-size: 0.85rem;
+  margin: 0;
+  text-align: left;
+}

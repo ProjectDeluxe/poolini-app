@@ -1,0 +1,63 @@
+POOLAPPDELUXE — AGENTE DE REPETICION
+Instrucciones para la PC que tiene la camara y OBS conectados a la mesa.
+
+Esto NO se instala solo ni se descarga logueandote en la app. La app de
+PoolAppDeluxe (la que esta en Vercel) corre en un navegador y no tiene forma
+de instalar ni prender programas en tu computadora por si sola — ningun sitio
+web puede hacer eso, es una regla de seguridad de todos los navegadores, no
+un problema de esta app en particular.
+
+Lo que si corre solo (sin que hagas nada de esto) es la parte de la app que
+ya usan los jugadores desde el celular: eso ya esta online en Vercel, andan
+con solo abrir el link.
+
+Esta carpeta es la UNICA parte que tenes que poner en marcha a mano, UNA
+SOLA VEZ por cada mesa/computadora, porque necesita hablarle directamente a
+OBS en esta misma maquina.
+
+PASOS (una sola vez):
+
+1. Instalar Node.js: https://nodejs.org (el boton verde "LTS"). Instalar
+   dejando todo como viene por defecto.
+
+2. Instalar ffmpeg: abrir PowerShell y escribir:
+       winget install ffmpeg
+   Si no anda, bajarlo de https://ffmpeg.org y seguir sus instrucciones.
+
+3. En OBS (con la camara de la mesa ya agregada a una escena):
+   - Configuracion -> Salida -> pestaña "Buffer de repeticion" -> activarlo,
+     Tiempo maximo de repeticion = 60 segundos.
+   - Iniciar el buffer (deberia haber un boton "Iniciar buffer de
+     repeticion" en la ventana principal).
+   - Herramientas -> "WebSocket Server Settings" -> activar el servidor.
+     Anotar el puerto (por defecto 4455) y la contraseña si le pusiste una.
+   - Apretar "Iniciar Camara Virtual".
+
+4. En esta carpeta: copiar el archivo ".env.example", renombrar la copia a
+   ".env", y abrirlo con el Bloc de notas. Completar:
+   - SUPABASE_URL y SUPABASE_SERVICE_KEY: se consiguen en
+     supabase.com -> tu proyecto -> Configuracion -> API.
+     OJO: es la "service_role" key (secreta), no la que usa la app.
+   - OBS_WS_PASSWORD: la contraseña del paso 3 (vacio si no le pusiste).
+   Guardar y cerrar.
+
+5. Doble click en "iniciar-agente.bat" (el archivo de esta misma carpeta).
+   La primera vez va a tardar un par de minutos instalando. Dejar esa
+   ventana negra abierta — mientras este abierta, el sistema funciona.
+
+6. En el navegador de esta PC (la que esta conectada a la tele por HDMI),
+   abrir:
+       http://localhost:5051/replay-display.html
+   y poner pantalla completa (F11).
+
+LISTO. Para probar: desde el celu, entra a la partida (por el link de
+Vercel o escaneando el QR) y toca un boton de repeticion. Deberia aparecer
+en la tele en unos segundos.
+
+Si algo falla, el mensaje de error va a aparecer en la ventana negra del
+paso 5 — copialo y mandaselo a Claude para resolverlo (README.md de esta
+carpeta tiene mas detalle de los problemas mas comunes).
+
+PARA LA PROXIMA VEZ que uses esta misma PC/mesa: solo hace falta el paso 5
+y el paso 6 — todo lo demas (instalar, configurar OBS, el .env) ya queda
+guardado.

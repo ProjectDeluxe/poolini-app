@@ -1,0 +1,150 @@
+# PoolAppDeluxe — Roadmap y arquitectura (v1)
+
+Documento vivo. Última actualización: 2026-10-06, a partir de la revisión del código existente y la definición de producto con Agus.
+
+> **Actualización 2026-10-06:** veredicto de escalabilidad del esquema actual (Supabase/Vercel/OBS) para producción masiva — ver sección 9.
+>
+> **Actualización 2026-09-27:** se define la estrategia de expansión a otros deportes (no solo pool) — ver sección 8.
+>
+> **Actualización 2026-09-01:** se agregó la funcionalidad de repetición en una tele por mesa (opcional, a criterio de cada club) — ver sección 5.1.
+
+## 1. Visión del producto
+
+PoolAppDeluxe deja de ser un simple marcador de pool para convertirse en un producto comercializable para clubes reales: los jugadores registran sus partidas, quedan grabadas en su perfil, y pueden publicarlas dentro de la app o descargarlas. El modelo de negocio combina tres capas:
+
+- **Jugador free**: entra y juega gratis, sin fricción. Esto es lo que hace atractiva la instalación para el club (adopción).
+- **Jugador suscripto**: paga para guardar clips más allá del límite gratuito, descargarlos en calidad completa, y publicarlos.
+- **Club (B2B)**: paga una mensualidad por mesa instalada, con el costo del hardware (cámara + mini-PC) amortizado en esa cuota en vez de cobrado aparte.
+
+Además de grabar, cada club puede optar por poner **una tele por mesa mostrando la partida en vivo mientras se juega** (no solo el clip después) — es una decisión de cada club, no algo que la app le imponga.
+
+La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el terreno de juego + grabación + repetición + guardado en el perfil) aplica a cualquier deporte filmable — tenis, pádel, básquet, lo que sea. La estrategia elegida para eso es vender **una app personalizada por club/cliente** en vez de un único producto multi-tenant compartido (ver sección 8).
+
+## 2. Decisiones de producto tomadas
+
+| Tema | Decisión |
+|---|---|
+| Captura de video | Cámara fija apuntando a la mesa, conectada a un mini-PC dedicado por mesa |
+| Topología en el club | **Un mini-PC + cámara por mesa** (no una PC central manejando varias mesas) — cada mesa es independiente, el club escala agregando hardware mesa por mesa |
+| Modelo de negocio | Híbrido: jugar es gratis siempre; descargar/guardar clips requiere suscripción a partir de cierto uso; el club paga una mensualidad por mesa con instalación bonificada |
+| Qué limita la suscripción | Cantidad/duración de clips guardados **y** publicar/compartir públicamente. Propuesta de arranque: plan free = 1 clip corto guardado por mes, y va creciendo con el nivel de suscripción |
+| Prioridad actual | Diseñar la arquitectura completa antes de escribir código nuevo |
+| Repetición en tele | Feature opcional por club: tele por mesa que muestra la repetición de la última jugada bajo pedido (no una transmisión en vivo continua) — delay de un par de segundos es aceptable |
+| Cámara | Fija, cenital (desde arriba), siempre encuadrando la mesa — sin zoom ni movimiento |
+| Hardware sugerido | Mini-PC tipo Intel N100 (no Raspberry Pi) por el decodificador/codificador de video por hardware — necesario porque el mismo equipo tiene que mostrar el video en vivo, mantener el buffer para clips, y codificar/subir clips a demanda |
+| Expansión a otros deportes | Vender una **app personalizada por cliente/club** (no un SaaS multi-tenant único) — cada deporte/club es esencialmente una instancia propia derivada de la misma base de código |
+| Orden de trabajo | Primero terminar y validar PoolAppDeluxe (pruebas de cámara en casa, luego un club de pool real); recién cuando el sistema esté andando, portarlo para un club de tenis (el profe de tenis de Agus) como segundo caso de venta |
+
+### Pendiente de definir con Agus
+- Presupuesto/target de costo por mesa para el hardware (mini-PC + cámara + tele si aplica).
+- Precio de los planes (jugador y club).
+- Si el club tiene un panel de administración propio (ver mesas activas, jugadores frecuentes) como parte del plan pago del club.
+- Moderación de contenido publicado públicamente (¿alguien revisa antes de publicar? ¿reporte de usuarios?).
+- Altura/ángulo de montaje de la cámara cenital según la altura típica de techo en un club (define el lente/campo de visión necesario para cubrir la mesa completa).
+
+## 3. Estado actual del código (auditoría 2026-09-01)
+
+**Funciona de punta a punta:** login por SMS/OTP (Supabase Auth), CRUD de jugadores con avatar, flujo de partida completo (crear → QR → control desde el celu → marcador en tiempo real vía Supabase Realtime → finalizar con ganador), historial, y estadísticas de winrate por jugador.
+
+**No implementado:**
+- `Clips.jsx` es un placeholder vacío. No existe grabación, ni almacenamiento, ni reproducción de video.
+- El botón "Guardar clip" inserta un comando en `realtime_commands` pero no hay ningún proceso (PC/mini-PC) escuchando esa tabla para generar el clip.
+- `mark_moment` y `score_update` están en el schema de `realtime_commands` pero no se usan en ningún lado del código.
+- No existe el concepto de club ni de mesa en el modelo de datos — todas las partidas son "sueltas".
+- No hay suscripciones ni ningún tipo de cobro integrado.
+
+**Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS son permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema).
+
+## 4. Modelo de datos — qué hay que agregar
+
+Además de lo que ya existe (`players`, `matches`, `clips`, `interactions`, `realtime_commands`):
+
+- **`clubs`**: id, name, address, contact, subscription_status/plan, stripe_customer_id, created_at.
+- **`tables`**: id, club_id, label (ej "Mesa 3"), device_id (identifica al mini-PC/cámara asignado), status (online/offline), created_at.
+- **`devices`**: id, table_id, auth_token (para que el mini-PC se autentique contra Supabase con permisos acotados, distinto de la anon key que usa la app de los jugadores), last_seen_at.
+- **`matches`**: agregar `club_id` y `table_id` (FK).
+- **`user_subscriptions`**: user_id, plan, status, stripe_subscription_id, current_period_end.
+- **`club_subscriptions`**: club_id, plan, status, stripe_subscription_id, tables_included.
+- **`clips`**: agregar `is_public` (bool), `expires_at` (para el borrado automático del plan free), `downloaded_at`.
+
+## 5. Pipeline de video (mini-PC por mesa)
+
+**Actualización 2026-09-28 — piloto con OBS:** para probar hoy, en vez de escribir un agente de captura desde cero, usamos **OBS** (que Agus ya tiene corriendo con la cámara de su mesa de casa) y su función nativa de **Replay Buffer**, más un agente chico (`agent/replay-agent/` en este repo) que hace de puente entre Supabase y OBS. Esto probablemente alcance también para el piloto en un club real, no solo para la prueba de hoy — se decide si conviene reemplazarlo por un agente propio más adelante, cuando haya datos reales de uso (por ahora no hace falta).
+
+Además, se sacó el botón de "guardar clip" del control del celu: por ahora la única acción es pedir una **repetición** (20s / 40s / 1min), sin generar todavía un clip permanente guardado al perfil. La edición/recorte automático con IA que Agus quiere agregar después va a trabajar sobre este mismo mecanismo, así que no hacía falta resolver las dos cosas (repetición + guardado permanente) al mismo tiempo.
+
+1. El agente (`agent/replay-agent/`) corre en la PC de la mesa (la que tiene OBS y la cámara — **no** es necesariamente la misma PC donde se desarrolla el resto de la app) y se suscribe vía Supabase Realtime a `realtime_commands`, igual que ya hace `PartidaControl.jsx` para el marcador.
+2. Cuando el celu manda un comando `mark_moment` con `payload.duration_sec` (20, 40 o 60), el agente le pide a OBS por WebSocket (`SaveReplayBuffer`) que vuelque el buffer a un archivo.
+3. El agente recorta con `ffmpeg` los últimos N segundos pedidos y lo deja disponible en una página local (`replay-display.html`) que se abre en pantalla completa en el navegador de la tele conectada por HDMI a esa PC.
+4. Como el celu nunca le habla directo a la PC de la mesa (todo pasa por Supabase, que es la nube), esto funciona aunque el celu esté en otra red distinta a la de esa PC — solo la PC de la mesa necesita tener internet para llegar a Supabase. Ver el `README.md` de esa carpeta para la puesta en marcha paso a paso.
+5. `save_clip` sigue existiendo en el schema (`realtime_commands.type`) para cuando se construya el guardado permanente / edición con IA, pero hoy no se usa desde ningún botón.
+6. Cuando llega `end_match`: cierra la grabación de esa mesa (hoy `PartidaControl` ya llama directo a `finishMatchById`; conviene unificarlo para que sea el agente el que reacciona al comando realtime, y sacar la llamada duplicada del cliente) — pendiente, no bloquea la prueba de hoy.
+7. **Storage** (para cuando se agregue el guardado permanente): evaluar Supabase Storage vs. algo más barato para video a escala como Cloudflare R2 o Backblaze B2 — con muchos clubes y clips esto es el costo variable más grande del negocio, vale la pena decidirlo antes de escalar, no después.
+8. **Borrado automático plan free** (a futuro, cuando exista guardado permanente): un job programado que borra del storage y marca como expirado cualquier clip de usuario free con `expires_at` vencido.
+
+### 5.1 Repetición en la tele (por mesa, opcional para el club)
+
+**Redefinido:** no es una transmisión en vivo continua — Agus aclaró que el objetivo real es poder ver la repetición de una jugada, no mirar la mesa como si fuera un stream. Esto simplifica el diseño y confirma que un delay de un par de segundos es aceptable.
+
+- **Cámara cenital fija**, siempre encuadrando la mesa desde arriba. Sin zoom ni movimiento (nada de PTZ) — más simple y barata, y de paso todos los clips quedan con el mismo encuadre consistente, lo cual ayuda a que se vean prolijos si después se publican.
+- **Flujo de repetición**: el mini-PC mantiene el buffer rotativo local (el mismo que ya se necesita para los clips). Desde el control del celu, un botón "repetición" manda un comando `mark_moment` por Realtime (hoy definido en el schema pero sin usar) — distinto de `save_clip`. El mini-PC reacciona reproduciendo en la tele los últimos N segundos del buffer, una vez, sin necesariamente subirlo a storage. Si el jugador después quiere guardarlo, ahí sí dispara `save_clip`.
+- **Conexión a la tele**: al no ser tiempo real estricto, no hace falta cable HDMI obligatorio — una tele inalámbrica (Chromecast, smart TV en la red local) funciona bien, aunque el cable directo sigue siendo la opción más simple y confiable para instalar.
+- **Hardware**: se mantiene la recomendación de mini-PC tipo Intel N100 — de sobra para mantener el buffer, reproducir la repetición, y codificar/subir un clip ocasional, todo en el mismo equipo.
+
+### 5.2 Distribución del agente a clubes reales (futuro — no para el piloto de hoy)
+
+**Idea de Agus (2026-10-06):** en vez de que cada club configure el agente a mano, que el panel del club (todavía no existe) tenga un botón de "descargar agente para esta mesa" después de loguearse y pasar una verificación — les llega la carpeta ya lista para esa mesa puntual, sin que el club tenga que copiar y pegar claves de Supabase.
+
+La idea es correcta y de hecho es justo lo que la tabla `devices` de la sección 4 ya estaba pensada para resolver — ahí falta conectar una pieza:
+
+- **No se puede embeber la `SUPABASE_SERVICE_KEY`** (la llave maestra que usa el agente de hoy) en un archivo que se descarga a la computadora de un cliente — esa key da acceso a la base completa, de todos los clubes. Si la PC de un club se compromete, se expone la información de todos los demás clubes, no solo el suyo.
+- En su lugar, el botón de descarga tiene que llamar a un backend propio (una función serverless, no el navegador directo a Supabase) que: valida que el club está verificado, crea una fila nueva en `devices` con un token propio y acotado para esa mesa (vía políticas RLS que solo le dejen leer/escribir lo de su `club_id`/`table_id`, no el resto de la base), arma el `.env` con ESE token (nunca con la service key), empaqueta la carpeta del agente al vuelo, y la entrega para descargar.
+- Con eso, perder o filtrar la carpeta de una mesa solo compromete esa mesa, no la plataforma entera.
+
+Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del modelo de datos) — no es para construir ahora, pero queda el criterio de seguridad anotado para no tener que rehacerlo más adelante bajo presión.
+
+## 6. Roadmap por fases
+
+**Fase 1 — Modelo de datos club/mesa.** Agregar `clubs`, `tables`, `devices` y vincular `matches` a una mesa. Pantalla mínima para dar de alta un club y sus mesas (puede ser interna/admin, no hace falta que sea linda todavía).
+
+**Fase 2 — Piloto de grabación y repetición en una sola mesa.** Construir el agente del mini-PC y probar el flujo completo (grabar → repetición en tele bajo pedido vía `mark_moment` → recortar/guardar vía `save_clip` → subir → ver el clip en el perfil) con un club/mesa de prueba, cámara cenital fija, sin todavía meter pagos ni límites. El objetivo es validar que la parte técnica más riesgosa (captura continua + repetición + recorte + upload, todo en el mismo mini-PC) funciona antes de invertir en escalarla.
+
+**Fase 3 — Suscripciones y paywall.** Integrar Stripe (jugador y club), guardar el estado de suscripción en Supabase, aplicar los límites (cantidad de clips, descarga, publicar) en el cliente y reforzarlos con RLS. Sumar el job de borrado automático del plan free.
+
+**Fase 4 — Publicar y compartir.** Feed o galería de clips públicos, compartir por link, descarga habilitada según plan.
+
+**Fase 5 — Endurecer para producción real.** Ajustar las políticas RLS (hoy abiertas a "cualquier autenticado"), moderación de contenido público, monitoreo de mini-PCs (saber si una cámara se cayó), limpieza del código muerto y validaciones pendientes del punto 3.
+
+## 7. Próximo paso concreto
+
+Con esto acordado, el siguiente movimiento natural es arrancar la **Fase 1** (modelo de datos club/mesa) — es chico, no depende de decisiones de hardware/precio que todavía están abiertas, y es la base sobre la que se apoya todo lo demás.
+
+## 8. Expansión a otros deportes (tenis y lo que siga)
+
+**Decisión (2026-09-27):** para "vender" esto a distintos clubes, el camino elegido es armar **una app personalizada por cliente** — cada club recibe una instancia propia adaptada a su deporte — en vez de un único producto multi-tenant donde todos los clubes compartan el mismo motor con un skin distinto. Es más trabajo de mantenimiento a largo plazo si esto crece a muchos clientes, pero es más simple y más rápido de vender caso por caso, que es lo que importa ahora.
+
+**Orden de trabajo:** no se toca nada de esto todavía. Primero se termina de validar PoolAppDeluxe — pruebas de cámara en la mesa de pool de casa de Agus, y después (ojalá) una instalación real en un club de pool. Recién cuando ese sistema esté funcionando de punta a punta, se porta a un club de tenis (el profe de tenis de Agus) como segundo cliente/caso de venta.
+
+**Qué se reutiliza tal cual (agnóstico al deporte):**
+- El pipeline de video completo: cámara fija + mini-PC, buffer rotativo, comandos `mark_moment` (repetición) y `save_clip` (guardado) por Supabase Realtime, subida a storage.
+- Auth por SMS/OTP, perfiles de usuario, y — cuando se construya en la Fase 3 — el motor de suscripciones/paywall.
+- El concepto de club → cancha/mesa → sesión, que ya se generalizó en la sección 4 (`clubs`, `tables`, `devices`).
+
+**Qué NO se reutiliza tal cual — es específico de cada deporte:**
+- **El marcador.** `matches.score1`/`score2` como enteros simples funciona para pool (se suman puntos) pero no para tenis (sets, games, puntos, ventajas, quién saca) ni para la mayoría de otros deportes. Cuando llegue el momento de portar a tenis, esto va a necesitar su propio modelo de marcador — no generalizarlo de antemano sin un segundo caso real, para no adivinar mal.
+- Terminología y textos de la UI ("Jugadores", "Partidas" → en tenis serían "Partidos", "Sets", etc.).
+- Encuadre/montaje de cámara: pool es cenital sobre una mesa chica; una cancha de tenis es mucho más grande, va a necesitar otro ángulo/lente (probablemente lateral o desde una altura mayor, a definir cuando llegue ese momento).
+
+**Nota para no perder de vista mientras se sigue con pool:** no hace falta diseñar el "motor multi-deporte" ahora. Alcanza con evitar, donde sea gratis hacerlo, dejar la lógica de marcador y las partes específicas de pool bien separadas del resto (auth, video, suscripciones) para que portar a tenis más adelante sea más armar-de-nuevo-esa-parte que reescribir todo.
+
+## 9. Veredicto de escalabilidad para producción masiva (2026-10-06)
+
+Agus preguntó directamente si este esquema aguanta producción en serio, con muchos clubes. Respuesta honesta, en dos partes:
+
+**Lo que sí aguanta tal cual:** Supabase (Postgres + Auth + Realtime + Storage) y Vercel no son herramientas de prototipo — soportan carga de producción real. Lo único que cambia con la escala es pasar a un plan pago de Supabase antes de tener clientes de verdad: no solo para que el proyecto no se pause por inactividad (ya nos pasó probando), sino porque el plan free tiene un límite de conexiones simultáneas de Realtime que con varios clubes activos a la vez se supera. Es una decisión de cuándo pagar, no de cambiar de arquitectura.
+
+**Lo que NO aguanta "muchos clubes sin que Agus esté encima" — y está bien que sea así por ahora:** OBS + el agente corriendo a mano en cada PC es ideal para validar la idea y hasta para los primeros clientes reales (ahí Agus va a estar presente instalando igual). Pero OBS es software pensado para que un humano lo mire, no un servicio desatendido: no se reinicia solo si se cuelga, no avisa si una cámara se desconectó en un club donde nadie de PoolAppDeluxe está presente, y cada instalación nueva repite toda la configuración a mano. Para escalar a muchos clubes sin visitar cada uno, esto eventualmente se reemplaza por: un servicio propio (no OBS) corriendo como proceso del sistema operativo con reinicio automático, una imagen de SO pre-armada para cargar en cada mini-PC nueva en vez de instalar todo de cero, y monitoreo remoto (la tabla `devices` de la sección 4 ya tiene `last_seen_at` pensado para esto). Esto ya estaba cubierto por la Fase 5 ("endurecer para producción real") — no es una sorpresa nueva, es simplemente confirmar que corresponde hacerlo después de validar que el producto se vende, no antes.
+
+**El otro factor de escala a no perder de vista:** el costo de storage/egress de video (sección 5, punto 7) crece con la cantidad de clubes y clips — ahí es donde más rápido sube la factura a medida que esto crece, más que en la base de datos en sí.
+
+**Conclusión:** no cambiar nada del esquema actual ahora. Es el orden correcto — validar barato primero, endurecer después — y las dos cosas que no escalan (OBS manual, storage de video) ya estaban identificadas como trabajo de una fase posterior, no como errores de diseño de hoy.

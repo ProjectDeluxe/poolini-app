@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>PoolAppDeluxe — Repetición</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      height: 100%;
+      overflow: hidden;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+    #idle {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.25);
+      font-family: sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 0 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="idle">POOLAPPDELUXE<br />esperando repetición…</div>
+  <video id="player" playsinline autoplay></video>
+
+  <script>
+    const video = document.getElementById('player');
+    const idle = document.getElementById('idle');
+    let lastSeen = 0;
+
+    async function poll() {
+      try {
+        const res = await fetch('/status', { cache: 'no-store' });
+        const data = await res.json();
+        if (data.lastUpdate && data.lastUpdate !== lastSeen) {
+          lastSeen = data.lastUpdate;
+          idle.style.display = 'none';
+          video.src = `/replay-latest.mp4?t=${lastSeen}`;
+          video.muted = false;
+          video.play().catch(() => {
+            // el navegador bloqueó el audio en autoplay — reintentamos muteado
+            video.muted = true;
+            video.play();
+          });
+        }
+      } catch (e) {
+        // silencioso — sigue intentando cada segundo
+      }
+      setTimeout(poll, 1000);
+    }
+    poll();
+  </script>
+</body>
+</html>

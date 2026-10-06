@@ -68,6 +68,45 @@
   transform: scale(1.05);
 }
 
+/* Footer del sidebar: usuario + logout */
+.sidebar-footer {
+  margin-top: auto;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-phone {
+  font-size: 1.4rem;
+  cursor: default;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px 8px;
+  transition: 0.2s;
+}
+
+.logout-btn:hover {
+  border-color: rgba(255, 100, 100, 0.6);
+  color: #ff5c5c;
+}
+
+@media (max-width: 768px) {
+  .sidebar-footer {
+    flex-direction: row;
+    margin: 0;
+    gap: 0;
+  }
+}
+
 /* Ajuste para que el contenido de la página no quede debajo del sidebar */
 
 .page-content,
