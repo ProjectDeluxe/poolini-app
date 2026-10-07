@@ -1,5 +1,5 @@
 -- ============================================================
--- POOL APP DELUXE — Schema completo v1.0
+-- POOL APP DELUXE — Schema completo v1.1 (incluye Fase 1: clubs/mesas)
 -- Pegar en Supabase → SQL Editor → Run
 -- ============================================================
 
@@ -19,12 +19,49 @@ CREATE TABLE IF NOT EXISTS players (
 );
 
 -- ============================================================
+-- TABLA: clubs
+-- ============================================================
+CREATE TABLE IF NOT EXISTS clubs (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name        TEXT NOT NULL,
+  address     TEXT,
+  contact     TEXT,                 -- teléfono / mail de contacto del club
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- TABLA: tables (mesas de cada club)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tables (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  club_id     UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+  label       TEXT NOT NULL,        -- ej "Mesa 3"
+  status      TEXT DEFAULT 'offline' CHECK (status IN ('online', 'offline')),
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (club_id, label)
+);
+
+-- ============================================================
+-- TABLA: devices (mini-PC + cámara asignado a una mesa)
+-- Guarda solo el HASH del token del agente, nunca el token en claro.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS devices (
+  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  table_id         UUID UNIQUE REFERENCES tables(id) ON DELETE SET NULL,
+  auth_token_hash  TEXT,
+  last_seen_at     TIMESTAMPTZ,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
 -- TABLA: matches
 -- ============================================================
 CREATE TABLE IF NOT EXISTS matches (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   player1_id    UUID REFERENCES players(id) ON DELETE SET NULL,
   player2_id    UUID REFERENCES players(id) ON DELETE SET NULL,
+  club_id       UUID REFERENCES clubs(id)  ON DELETE SET NULL,   -- NULL = partida suelta
+  table_id      UUID REFERENCES tables(id) ON DELETE SET NULL,
   score1        INT DEFAULT 0,
   score2        INT DEFAULT 0,
   winner_id     UUID REFERENCES players(id) ON DELETE SET NULL,
@@ -79,6 +116,9 @@ CREATE TABLE IF NOT EXISTS realtime_commands (
 -- INDICES para performance
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_matches_status       ON matches(status);
+CREATE INDEX IF NOT EXISTS idx_matches_club_id      ON matches(club_id);
+CREATE INDEX IF NOT EXISTS idx_matches_table_id     ON matches(table_id);
+CREATE INDEX IF NOT EXISTS idx_tables_club_id       ON tables(club_id);
 CREATE INDEX IF NOT EXISTS idx_clips_match_id       ON clips(match_id);
 CREATE INDEX IF NOT EXISTS idx_clips_status         ON clips(status);
 CREATE INDEX IF NOT EXISTS idx_interactions_clip_id ON interactions(clip_id);
@@ -111,6 +151,9 @@ ALTER TABLE matches            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clips              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE interactions       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE realtime_commands  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clubs              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tables             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE devices            ENABLE ROW LEVEL SECURITY;  -- sin políticas: solo service role
 
 -- Políticas: usuario autenticado puede leer y escribir todo (MVP)
 CREATE POLICY "auth_read_all"  ON players           FOR SELECT USING (auth.role() = 'authenticated');
@@ -127,6 +170,12 @@ CREATE POLICY "auth_write_all" ON interactions       FOR ALL    USING (auth.role
 
 CREATE POLICY "auth_read_all"  ON realtime_commands  FOR SELECT USING (auth.role() = 'authenticated');
 CREATE POLICY "auth_write_all" ON realtime_commands  FOR ALL    USING (auth.role() = 'authenticated');
+
+CREATE POLICY "auth_read_all"  ON clubs              FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_all" ON clubs              FOR ALL    USING (auth.role() = 'authenticated');
+
+CREATE POLICY "auth_read_all"  ON tables             FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "auth_write_all" ON tables             FOR ALL    USING (auth.role() = 'authenticated');
 
 -- Storage policies
 CREATE POLICY "public_read_clips"   ON storage.objects FOR SELECT USING (bucket_id = 'clips');

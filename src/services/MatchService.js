@@ -18,7 +18,8 @@ export async function getMatchById(id) {
     .select(`
       *,
       player1:players!player1_id(id, name, avatar_url),
-      player2:players!player2_id(id, name, avatar_url)
+      player2:players!player2_id(id, name, avatar_url),
+      table:tables!table_id(id, label, club:clubs(id, name))
     `)
     .eq("id", id)
     .single();
@@ -27,11 +28,19 @@ export async function getMatchById(id) {
   return data;
 }
 
-// Crea una partida nueva
-export async function createMatch(player1_id, player2_id) {
+// Crea una partida nueva (mesa opcional: sin mesa queda como partida suelta)
+export async function createMatch(player1_id, player2_id, table = null) {
   const { data, error } = await supabase
     .from("matches")
-    .insert({ player1_id, player2_id, score1: 0, score2: 0, status: "active" })
+    .insert({
+      player1_id,
+      player2_id,
+      club_id: table?.club_id ?? null,
+      table_id: table?.id ?? null,
+      score1: 0,
+      score2: 0,
+      status: "active",
+    })
     .select()
     .single();
 

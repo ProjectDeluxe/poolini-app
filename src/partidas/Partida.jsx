@@ -51,6 +51,11 @@ export default function Partida() {
         <h1 className="partida-title">
           {p1?.name ?? "Jugador 1"} <span className="vs">vs</span> {p2?.name ?? "Jugador 2"}
         </h1>
+        {match.table && (
+          <span className="partida-mesa">
+            {match.table.club?.name} · {match.table.label}
+          </span>
+        )}
         <span className={`partida-status ${finished ? "status-finished" : "status-active"}`}>
           {finished ? "FINALIZADA" : "EN CURSO"}
         </span>

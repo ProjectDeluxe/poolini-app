@@ -1,0 +1,105 @@
+.clubs-page {
+  max-width: 700px;
+  margin: 0 auto;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.clubs-error {
+  color: #ff7a7a;
+  margin-bottom: 16px;
+}
+
+.clubs-empty {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.85rem;
+}
+
+.club-form,
+.table-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.table-form {
+  margin: 12px 0 0;
+  justify-content: flex-start;
+}
+
+.club-form input,
+.table-form input {
+  flex: 1 1 180px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+}
+
+.table-form .btn {
+  font-size: 0.9rem;
+  padding: 8px 16px;
+}
+
+.clubs-list,
+.tables-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.club-card {
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.35);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.club-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.club-name {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+}
+
+.club-meta {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.table-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.table-row > span:first-child {
+  flex: 1;
+}
+
+.table-status {
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.5);
+}
+
+.table-online {
+  border-color: rgba(50, 200, 100, 0.5);
+  color: #50e090;
+}

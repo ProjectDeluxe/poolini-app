@@ -1,7 +1,9 @@
 # PoolAppDeluxe — Roadmap y arquitectura (v1)
 
-Documento vivo. Última actualización: 2026-10-06, a partir de la revisión del código existente y la definición de producto con Agus.
+Documento vivo. Última actualización: 2026-10-07, a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). Falta correr la migración contra Supabase de producción — ver sección 6.1.
+>
 > **Actualización 2026-10-06 (noche):** primera prueba end-to-end real en producción — login, partida, y repetición en la tele funcionando de punta a punta por primera vez. Se descubrió y arregló que la base de datos de producción nunca había recibido el esquema completo (le faltaban tablas, columnas y permisos que el código ya daba por existentes) — ver sección 3.1 para el detalle completo de lo que se encontró y se arregló.
 >
 > **Actualización 2026-10-06:** veredicto de escalabilidad del esquema actual (Supabase/Vercel/OBS) para producción masiva — ver sección 9.
@@ -52,7 +54,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - `Clips.jsx` es un placeholder vacío. No existe grabación, ni almacenamiento, ni reproducción de video permanente (lo de hoy es repetición efímera, no guardado al perfil).
 - El botón "Guardar clip" inserta un comando en `realtime_commands` pero no hay ningún proceso (PC/mini-PC) escuchando esa tabla para generar el clip permanente — solo `mark_moment` (repetición) está conectado de punta a punta.
 - `score_update` está en el schema de `realtime_commands` pero no se usa en ningún lado del código.
-- No existe el concepto de club ni de mesa en el modelo de datos — todas las partidas son "sueltas".
+- ~~No existe el concepto de club ni de mesa en el modelo de datos~~ → resuelto en la Fase 1 (2026-10-07, ver 6.1). Las partidas pueden seguir siendo "sueltas" (sin mesa) a propósito.
 - No hay suscripciones ni ningún tipo de cobro integrado.
 
 **Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS son permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema).
@@ -129,6 +131,26 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 **Fase 1 — Modelo de datos club/mesa.** Agregar `clubs`, `tables`, `devices` y vincular `matches` a una mesa. Pantalla mínima para dar de alta un club y sus mesas (puede ser interna/admin, no hace falta que sea linda todavía).
 
+### 6.1 Fase 1 — qué se hizo (2026-10-07)
+
+**Hecho en código:**
+- `supabase/migrations/2026-10-07-fase1-clubs-mesas.sql`: migración para la base que ya existe (producción). Crea `clubs`, `tables` y `devices`, y agrega `club_id`/`table_id` a `matches`. Es idempotente (se puede correr dos veces) y no toca datos existentes — probada contra un Postgres local simulando producción (schema v1.0 + datos, migración corrida dos veces, datos intactos).
+- `supabase-schema.sql` actualizado a v1.1 con lo mismo, para que una instalación nueva desde cero ya quede completa (lección de la sección 3.1). Probado desde cero en Postgres local.
+- `src/services/ClubService.js` + pantalla interna `/clubs` (ícono 🏢 en la barra lateral): alta/baja de clubs y de mesas por club. Sin diseño fino, como pedía la fase.
+- Nueva partida: selector opcional de mesa ("Club · Mesa N"); por defecto "Sin mesa (partida suelta)", así nada del flujo actual cambia si no se elige mesa. La pantalla de la partida muestra club y mesa cuando la tiene.
+
+**Decisiones tomadas en el camino (cambiables):**
+- Las partidas existentes quedan con `club_id`/`table_id` en NULL; la mesa es opcional también en partidas nuevas.
+- Borrar un club borra sus mesas (cascade); borrar un club o una mesa NO borra partidas, solo las desvincula (`ON DELETE SET NULL`).
+- `devices` guarda `auth_token_hash` (solo el hash, nunca el token en claro) y tiene RLS activado **sin políticas**: la app de los jugadores no puede leer ni escribir esa tabla, solo el service role. Es la base para el backend de la sección 5.2. Todavía no hay UI ni flujo para crear dispositivos — no hace falta hasta la Fase 2 / 5.2.
+- `clubs` todavía no tiene columnas de suscripción/Stripe (`subscription_status`, `stripe_customer_id`) de la sección 4: se agregan en la Fase 3, cuando se integre el cobro, para no adivinar el modelo antes.
+- `tables.device_id` de la sección 4 se invirtió: es `devices.table_id` (único), así una mesa tiene a lo sumo un dispositivo y reemplazar el mini-PC es solo crear otra fila.
+
+**Pendiente para cerrar la Fase 1:**
+- Correr `supabase/migrations/2026-10-07-fase1-clubs-mesas.sql` en Supabase de producción (SQL Editor → Run). Hasta que eso pase, la pantalla `/clubs` va a dar error y el selector de mesa queda vacío (la partida suelta sigue funcionando).
+- Probar en producción: crear un club, una mesa, una partida en esa mesa, y ver que aparece "Club · Mesa" en la pantalla de la partida.
+- El agente de repetición todavía no sabe a qué mesa pertenece (escucha todos los comandos). Asociarlo a su mesa vía `devices` es trabajo de la Fase 2 / sección 5.2.
+
 **Fase 2 — Piloto de grabación y repetición en una sola mesa.** Construir el agente del mini-PC y probar el flujo completo (grabar → repetición en tele bajo pedido vía `mark_moment` → recortar/guardar vía `save_clip` → subir → ver el clip en el perfil) con un club/mesa de prueba, cámara cenital fija, sin todavía meter pagos ni límites. El objetivo es validar que la parte técnica más riesgosa (captura continua + repetición + recorte + upload, todo en el mismo mini-PC) funciona antes de invertir en escalarla.
 
 **Fase 3 — Suscripciones y paywall.** Integrar Stripe (jugador y club), guardar el estado de suscripción en Supabase, aplicar los límites (cantidad de clips, descarga, publicar) en el cliente y reforzarlos con RLS. Sumar el job de borrado automático del plan free.
@@ -139,7 +161,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-Con esto acordado, el siguiente movimiento natural es arrancar la **Fase 1** (modelo de datos club/mesa) — es chico, no depende de decisiones de hardware/precio que todavía están abiertas, y es la base sobre la que se apoya todo lo demás.
+**Actualizado 2026-10-07:** la Fase 1 está escrita; falta correr la migración en producción y probarla (ver 6.1). Después de eso, sigue la **Fase 2** (piloto de grabación y repetición en una mesa), que ya tiene buena parte adelantada con el agente de OBS (sección 5).
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 
