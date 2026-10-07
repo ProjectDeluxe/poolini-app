@@ -2,7 +2,7 @@
 
 Documento vivo. Última actualización: 2026-10-07 (Fase 2), a partir de la revisión del código existente y la definición de producto con Agus.
 
-> **Actualización 2026-10-07 (tarde):** Fase 1 probada por Agus en producción (ok). Fase 2 implementada en código: botón "Guardar clip" en el celu → el agente de la mesa recorta, sube a Supabase Storage y crea el clip → se ve en 🎬 Clips & Replays y en el perfil de los jugadores. El agente ahora se ata a su mesa (`TABLE_ID`). Falta correr la migración en producción y la prueba real con la cámara — ver sección 6.2.
+> **Actualización 2026-10-07 (tarde):** Fase 1 probada por Agus en producción (ok). Fase 2 implementada en código: botón "Guardar clip" en el celu → el agente de la mesa recorta, sube a Supabase Storage y crea el clip → se ve en 🎬 Clips & Replays y en el perfil de los jugadores. El agente ahora se ata a su mesa (`TABLE_ID`). Migración corrida en producción y prueba real con cámara ok: Fase 2 cerrada — ver sección 6.2.
 >
 > **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). La migración ya se corrió en Supabase de producción y el código está en main; falta la prueba de punta a punta en producción — ver sección 6.1.
 >
@@ -159,6 +159,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 **Hecho en código:**
 - `supabase/migrations/2026-10-07-fase2-clips.sql`: crea `clips` si producción no la tiene (posible, ver 3.1) y le agrega `club_id`, `table_id`, `command_id`, `storage_path`, `error_message`, y ya de paso `is_public`, `expires_at`, `downloaded_at` de la sección 4 para no migrar dos veces. Agrega `clips` a Realtime, asegura el bucket `clips` y su política de lectura. Idempotente; probada en Postgres local en tres casos (base con schema completo + datos, base tipo producción sin `clips` ni bucket, y desde cero), corrida dos veces, datos intactos.
 - `supabase-schema.sql` actualizado a v1.2 con lo mismo.
+- **Encontrado al correrla en producción (2026-10-07):** falló con `column "status" does not exist`. Producción ya tenía una tabla `clips` creada a medias (otra vez lo de la sección 3.1), así que `CREATE TABLE IF NOT EXISTS` no la tocaba y el índice sobre `status` rompía. Se corrigió la migración para asegurar también cada columna del schema original con `ADD COLUMN IF NOT EXISTS`; probada contra una `clips` a medias con datos.
 - Agente (`agent/replay-agent/replay-agent.js`):
   - Nuevo `save_clip`: crea el clip en `processing`, le pide a OBS el buffer, recorta los últimos N segundos en 720p (CRF 26, `+faststart` para que el navegador lo reproduzca sin bajarlo entero), genera miniatura, sube los dos a Storage (`clips/<match_id>/<clip_id>.mp4|.jpg`) y pasa el clip a `ready` (o `error` con el motivo).
   - Nuevo `TABLE_ID` en el `.env`: si está, el agente solo reacciona a partidas de esa mesa y la marca `online` al arrancar / `offline` al cerrarse. Vacío = comportamiento de antes (cualquier partida).
@@ -179,9 +180,9 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 - **`end_match` sin cambios**: el cliente sigue finalizando la partida (ver sección 5, punto 6); no hacía falta para el piloto.
 
 **Pendiente para cerrar la Fase 2:**
-- Correr `supabase/migrations/2026-10-07-fase2-clips.sql` en Supabase de producción (SQL Editor).
+- ~~Correr `supabase/migrations/2026-10-07-fase2-clips.sql` en Supabase de producción (SQL Editor).~~ → hecho por Agus el 2026-10-07, con la versión corregida (ver arriba). Código en main desde el commit `41b054d`.
 - Actualizar la carpeta del agente en la PC de la mesa y poner `TABLE_ID` en su `.env` (opcional para probar en casa).
-- Prueba real: partida en una mesa → repetición en la tele → "Guardar clip" → verlo y descargarlo en Clips y en el perfil. Anotar cuánto pesa un clip de 1 min con la cámara real.
+- ~~Prueba real: partida en una mesa → repetición en la tele → "Guardar clip" → verlo y descargarlo en Clips y en el perfil.~~ → probado por Agus el 2026-10-07 con la cámara real: los clips se guardan desde el celu y quedan vinculados a la mesa y a los perfiles. Queda anotar cuánto pesa un clip de 1 min.
 - Si el estado de la mesa queda `online` después de apagar la PC de golpe, es esperado: el monitoreo con `devices.last_seen_at` es de la Fase 5.
 
 **Fase 3 — Suscripciones y paywall.** Integrar Stripe (jugador y club), guardar el estado de suscripción en Supabase, aplicar los límites (cantidad de clips, descarga, publicar) en el cliente y reforzarlos con RLS. Sumar el job de borrado automático del plan free.
@@ -192,7 +193,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-07 (tarde):** Fase 1 cerrada (probada en producción por Agus). Fase 2 escrita: falta correr su migración en producción y la prueba real con cámara (ver 6.2). Después sigue la **Fase 3** (suscripciones y paywall).
+**Actualizado 2026-10-07 (tarde):** Fase 1 cerrada (probada en producción por Agus). Fase 2 cerrada (en main, migración corrida y probada con cámara real por Agus, ver 6.2). Lo próximo es la **Fase 3** (suscripciones y paywall).
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 

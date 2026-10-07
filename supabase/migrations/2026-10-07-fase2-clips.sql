@@ -24,6 +24,19 @@ CREATE TABLE IF NOT EXISTS clips (
   created_at     TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Si la tabla ya existía en producción pero creada a medias (pasó: le
+-- faltaba `status`), CREATE TABLE IF NOT EXISTS no la toca. Por eso se
+-- aseguran también todas las columnas del schema original, una por una.
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS match_id       UUID REFERENCES matches(id) ON DELETE CASCADE;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS player1_id     UUID REFERENCES players(id) ON DELETE SET NULL;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS player2_id     UUID REFERENCES players(id) ON DELETE SET NULL;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS video_url      TEXT;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS thumbnail_url  TEXT;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS duration_sec   INT;
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS tags           TEXT[];
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS status         TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'ready', 'error'));
+ALTER TABLE clips ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ DEFAULT NOW();
+
 -- Columnas nuevas de la Fase 2 (y las de la sección 4 del ROADMAP que
 -- ya conviene tener para no migrar dos veces)
 ALTER TABLE clips ADD COLUMN IF NOT EXISTS club_id        UUID REFERENCES clubs(id)  ON DELETE SET NULL;
