@@ -5,6 +5,7 @@ import { useMatches } from "../context/MatchContext";
 import { uploadAvatar } from "../services/PlayerService";
 import { getClipsByPlayer } from "../services/ClipService";
 import ClipList from "../clips/ClipList.jsx";
+import { usePlan } from "../plan/usePlan";
 
 export default function PerfilJugador() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function PerfilJugador() {
   const { matches } = useMatches();
 
   const [clips, setClips] = useState([]);
+  const { plan } = usePlan();
 
   const player = players.find((p) => p.id === id);
 
@@ -105,7 +107,7 @@ async function changeAvatar(event) {
 </ul>
 
 <h3>Clips</h3>
-      <ClipList clips={clips} emptyText="Este jugador todavía no tiene clips guardados." />
+      <ClipList clips={clips} canDownload={!!plan?.can_download} emptyText="Este jugador todavía no tiene clips guardados." />
 
       <Link to="/jugadores">
         <button className="btn">Volver</button>

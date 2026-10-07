@@ -15,6 +15,7 @@ import Partida from "./partidas/Partida.jsx";
 import PartidaControl from "./partidas/PartidaControl.jsx";
 import PerfilJugador from "./jugadores/PerfilJugador.jsx";
 import Clubs from "./clubs/Clubs.jsx";
+import Plan from "./plan/Plan.jsx";
 
 import { PlayerProvider } from "./context/PlayerContext";
 import { MatchProvider } from "./context/MatchContext";
@@ -42,6 +43,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               <Route path="/historial" element={<ProtectedRoute><Historial /></ProtectedRoute>} />
               <Route path="/clips" element={<ProtectedRoute><Clips /></ProtectedRoute>} />
               <Route path="/clubs" element={<ProtectedRoute><Clubs /></ProtectedRoute>} />
+              <Route path="/plan" element={<ProtectedRoute><Plan /></ProtectedRoute>} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import "./Clips.css";
 
 function formatDate(iso) {
@@ -9,15 +10,18 @@ function formatDate(iso) {
   });
 }
 
-// Grilla de clips guardados (la usan la pantalla Clips y el perfil del jugador)
-export default function ClipList({ clips, emptyText = "Todavía no hay clips guardados." }) {
+// Grilla de clips guardados (la usan la pantalla Clips y el perfil del jugador).
+// canDownload: el plan del usuario logueado permite descargar (Fase 3).
+export default function ClipList({ clips, canDownload = false, emptyText = "Todavía no hay clips guardados." }) {
   if (clips.length === 0) return <p className="clips-empty">{emptyText}</p>;
 
   return (
     <ul className="clips-grid">
       {clips.map((c) => (
         <li key={c.id} className="clip-card">
-          {c.status === "ready" && c.video_url ? (
+          {c.expired_at ? (
+            <div className="clip-placeholder clip-expired">Vencido</div>
+          ) : c.status === "ready" && c.video_url ? (
             <video
               className="clip-video"
               src={c.video_url}
@@ -41,10 +45,19 @@ export default function ClipList({ clips, emptyText = "Todavía no hay clips gua
                 .filter(Boolean)
                 .join(" · ")}
             </span>
-            {c.status === "ready" && c.video_url && (
-              <a className="clip-download" href={`${c.video_url}?download=`} download>
-                ⬇ Descargar
-              </a>
+            {c.expires_at && !c.expired_at && (
+              <span className="clip-meta">Se borra el {new Date(c.expires_at).toLocaleDateString("es-AR")}</span>
+            )}
+            {c.status === "ready" && c.video_url && !c.expired_at && (
+              canDownload ? (
+                <a className="clip-download" href={`${c.video_url}?download=`} download>
+                  ⬇ Descargar
+                </a>
+              ) : (
+                <Link className="clip-download clip-download-locked" to="/plan">
+                  🔒 Descargar con un plan pago
+                </Link>
+              )
             )}
           </div>
         </li>

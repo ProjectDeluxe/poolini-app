@@ -22,6 +22,7 @@ export default function Header() {
         <Link to="/historial" className="icon-btn" title="Historial">📊</Link>
         <Link to="/jugadores" className="icon-btn" title="Jugadores">👤</Link>
         <Link to="/clubs" className="icon-btn" title="Clubs y mesas">🏢</Link>
+        <Link to="/plan" className="icon-btn" title="Mi plan">💳</Link>
       </nav>
 
       {/* Usuario logueado */}

@@ -1,7 +1,9 @@
 # PoolAppDeluxe — Roadmap y arquitectura (v1)
 
-Documento vivo. Última actualización: 2026-10-07 (Fase 2), a partir de la revisión del código existente y la definición de producto con Agus.
+Documento vivo. Última actualización: 2026-10-07 (Fase 3), a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-07 (noche):** Fase 3 arrancada. Hecha la parte que no depende del proveedor de pago: planes (free/plus/pro) con sus límites en la base, límite de clips aplicado por la base al tocar "Guardar clip", pantalla 💳 Mi plan, descarga solo con plan pago, y job diario que borra los clips vencidos del plan free. Medido: un clip de 1 minuto pesa ~2,6 MB. Falta elegir proveedor de pago (Stripe no opera con comercios argentinos) y los precios — ver sección 6.3.
+>
 > **Actualización 2026-10-07 (tarde):** Fase 1 probada por Agus en producción (ok). Fase 2 implementada en código: botón "Guardar clip" en el celu → el agente de la mesa recorta, sube a Supabase Storage y crea el clip → se ve en 🎬 Clips & Replays y en el perfil de los jugadores. El agente ahora se ata a su mesa (`TABLE_ID`). Migración corrida en producción y prueba real con cámara ok: Fase 2 cerrada — ver sección 6.2.
 >
 > **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). La migración ya se corrió en Supabase de producción y el código está en main; falta la prueba de punta a punta en producción — ver sección 6.1.
@@ -43,7 +45,8 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 
 ### Pendiente de definir con Agus
 - Presupuesto/target de costo por mesa para el hardware (mini-PC + cámara + tele si aplica).
-- Precio de los planes (jugador y club).
+- Precio de los planes (jugador y club). La estructura de planes ya está (sección 6.3); faltan los montos.
+- Proveedor de pago: Mercado Pago vs. Stripe (sección 6.3).
 - Si el club tiene un panel de administración propio (ver mesas activas, jugadores frecuentes) como parte del plan pago del club.
 - Moderación de contenido publicado públicamente (¿alguien revisa antes de publicar? ¿reporte de usuarios?).
 - Altura/ángulo de montaje de la cámara cenital según la altura típica de techo en un club (define el lente/campo de visión necesario para cubrir la mesa completa).
@@ -56,7 +59,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - ~~`Clips.jsx` es un placeholder vacío / `save_clip` no tiene a nadie escuchando~~ → resuelto en la Fase 2 (2026-10-07, ver 6.2): guardado permanente al perfil vía el agente de la mesa.
 - `score_update` está en el schema de `realtime_commands` pero no se usa en ningún lado del código.
 - ~~No existe el concepto de club ni de mesa en el modelo de datos~~ → resuelto en la Fase 1 (2026-10-07, ver 6.1). Las partidas pueden seguir siendo "sueltas" (sin mesa) a propósito.
-- No hay suscripciones ni ningún tipo de cobro integrado.
+- No hay cobro online integrado. Desde la Fase 3 (ver 6.3) existen los planes y sus límites; el plan pago se activa a mano mientras no haya proveedor de pago.
 
 **Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS son permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema).
 
@@ -105,7 +108,7 @@ Además, se sacó el botón de "guardar clip" del control del celu: por ahora la
 5. `save_clip`: desde la Fase 2 (ver 6.2) lo manda el botón "Guardar clip en el perfil" del celu; el agente recorta, sube a Supabase Storage y crea la fila en `clips`. La edición/recorte con IA va a trabajar sobre esto mismo.
 6. Cuando llega `end_match`: cierra la grabación de esa mesa (hoy `PartidaControl` ya llama directo a `finishMatchById`; conviene unificarlo para que sea el agente el que reacciona al comando realtime, y sacar la llamada duplicada del cliente) — pendiente, no bloquea la prueba de hoy.
 7. **Storage** (para cuando se agregue el guardado permanente): evaluar Supabase Storage vs. algo más barato para video a escala como Cloudflare R2 o Backblaze B2 — con muchos clubes y clips esto es el costo variable más grande del negocio, vale la pena decidirlo antes de escalar, no después.
-8. **Borrado automático plan free** (a futuro, cuando exista guardado permanente): un job programado que borra del storage y marca como expirado cualquier clip de usuario free con `expires_at` vencido.
+8. **Borrado automático plan free**: hecho en la Fase 3 (ver 6.3) — `api/cron/expire-clips.js`, una vez por día vía Vercel Cron.
 
 ### 5.1 Repetición en la tele (por mesa, opcional para el club)
 
@@ -182,10 +185,53 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 **Pendiente para cerrar la Fase 2:**
 - ~~Correr `supabase/migrations/2026-10-07-fase2-clips.sql` en Supabase de producción (SQL Editor).~~ → hecho por Agus el 2026-10-07, con la versión corregida (ver arriba). Código en main desde el commit `41b054d`.
 - Actualizar la carpeta del agente en la PC de la mesa y poner `TABLE_ID` en su `.env` (opcional para probar en casa).
-- ~~Prueba real: partida en una mesa → repetición en la tele → "Guardar clip" → verlo y descargarlo en Clips y en el perfil.~~ → probado por Agus el 2026-10-07 con la cámara real: los clips se guardan desde el celu y quedan vinculados a la mesa y a los perfiles. Queda anotar cuánto pesa un clip de 1 min.
+- ~~Prueba real: partida en una mesa → repetición en la tele → "Guardar clip" → verlo y descargarlo en Clips y en el perfil.~~ → probado por Agus el 2026-10-07 con la cámara real: los clips se guardan desde el celu y quedan vinculados a la mesa y a los perfiles. Medido: un clip de 1 minuto (720p, CRF 26) pesa **2.611 KB ≈ 2,6 MB**, muy lejos del límite de 50 MB por archivo de Supabase.
 - Si el estado de la mesa queda `online` después de apagar la PC de golpe, es esperado: el monitoreo con `devices.last_seen_at` es de la Fase 5.
 
 **Fase 3 — Suscripciones y paywall.** Integrar Stripe (jugador y club), guardar el estado de suscripción en Supabase, aplicar los límites (cantidad de clips, descarga, publicar) en el cliente y reforzarlos con RLS. Sumar el job de borrado automático del plan free.
+
+### 6.3 Fase 3 — qué se hizo (2026-10-07)
+
+**Dato de partida (de la Fase 2):** un clip de 1 minuto pesa ~2,6 MB (uno de 20 s, ~0,9 MB). Con los precios de lista de Supabase Pro (aprox., a confirmar al contratar: 100 GB de storage incluidos y después ~US$0,021 por GB al mes; 250 GB de transferencia incluidos y después ~US$0,09 por GB):
+- 100 GB alcanzan para ~38.000 clips de 1 minuto. Guardar un clip cuesta, fuera de lo incluido, del orden de US$0,00005 por mes.
+- Cada reproducción completa de un clip de 1 minuto son 2,6 MB de transferencia: 250 GB son ~96.000 reproducciones por mes.
+- Conclusión: **el storage no es lo que limita los planes**; lo que más va a costar es la transferencia cuando haya clips públicos (Fase 4). Los límites del plan free se definen por valor de producto (que den ganas de pagar), no por costo.
+
+**Hecho en código:**
+- `supabase/migrations/2026-10-07-fase3-planes.sql` (idempotente, tolera tablas a medias como pasó con `clips`; probada en Postgres local en tres casos: base con schema completo + datos, base tipo producción con tablas a medias y una `plans` a medias, y desde cero; corrida dos veces, datos intactos):
+  - `plans`: catálogo con los límites de cada plan. Los límites viven en la base, no en el código: cambiar un precio o un límite es editar la fila. Volver a correr la migración no pisa lo editado.
+  - `user_subscriptions`: una fila por usuario con plan pago (sin fila o vencida = free). La app solo puede leer la propia; escribirla es solo del backend de cobro o del SQL Editor.
+  - `club_subscriptions`: mensualidad por mesa del club, carga manual por ahora (no hay login ni panel de club).
+  - `realtime_commands.requested_by` (quién tocó "Guardar clip", lo pone la base) y `clips.owner_id` (a quién le cuenta el clip). Un trigger copia el dueño del comando al clip y calcula `expires_at` según su plan: **el agente de la mesa no necesita actualizarse**.
+  - Trigger que rechaza el pedido de clip si el plan no alcanza (cantidad por mes o duración), con un mensaje que el celu muestra. Los clips que terminan en error devuelven el cupo.
+  - Trigger que impide marcar un clip como público si el plan no lo permite (publicar llega en la Fase 4; la regla ya queda).
+  - RLS más estricto en `realtime_commands` (la app solo lee e inserta) y `clips` (la app solo lee), para que el límite no se esquive borrando pedidos o clips. El agente usa la service key, así que no le cambia nada.
+- `supabase-schema.sql` actualizado a v1.3 con lo mismo.
+- `api/cron/expire-clips.js` + `crons` en `vercel.json`: todos los días a las 7 UTC borra del bucket el video y la miniatura de los clips vencidos y los marca con `expired_at` (la fila queda). `vercel.json` ahora excluye `/api/` del rewrite al `index.html`.
+- App: pantalla 💳 **Mi plan** (plan actual, clips usados en el mes, catálogo de planes); el control del celu muestra cuántos clips quedan en el mes, deshabilita las duraciones que el plan no permite y avisa con link a planes si la base rechaza el pedido; en Clips y en el perfil, "Descargar" solo con plan pago, aviso de "Se borra el dd/mm" y clips vencidos como "Vencido".
+
+**Valores de arranque de los planes (cambiables editando `plans`):**
+
+| Plan | Clips por mes | Duración máx. | Se borran | Descarga | Publicar | Precio |
+|---|---|---|---|---|---|---|
+| Free | 1 | 20 s | a los 30 días | no | no | gratis |
+| Plus | 20 | 1 min | nunca | sí | sí | a definir |
+| Pro | ilimitado | 1 min | nunca | sí | sí | a definir |
+
+**Decisiones tomadas en el camino (cambiables):**
+- **El clip cuenta para quien tocó "Guardar clip"** (el usuario logueado en el celu), no para los dos jugadores. Lo sigue viendo cualquiera de los dos en su perfil.
+- **El límite lo aplica la base** (trigger), no solo la pantalla: no se saltea tocando el cliente. Es más simple y más claro que hacerlo con políticas RLS, y da un mensaje de error entendible.
+- **El vencimiento se fija al guardar el clip**: si alguien de plan free se pasa a pago después, sus clips viejos siguen venciendo; si alguien pago se da de baja, sus clips ya guardados se quedan.
+- **Los clips de la Fase 2 (sin dueño) no vencen ni cuentan** para ningún límite.
+- **La descarga se oculta en la app pero el bucket sigue público**: quien tenga el link del video lo puede bajar igual. Pasar el bucket a privado con links firmados queda para la Fase 4, junto con compartir por link.
+- **Activación manual mientras no haya cobro online:** desde el SQL Editor, `INSERT INTO user_subscriptions (user_id, plan_id, provider) VALUES ('<id de auth.users>', 'plus', 'manual');` (con `current_period_end` si tiene vencimiento).
+
+**Pendiente para cerrar la Fase 3:**
+- Elegir proveedor de pago. Stripe (lo que decía este documento) no abre cuentas a comercios de Argentina sin una empresa en el exterior; la alternativa natural es Mercado Pago (suscripciones con débito automático en pesos). Con eso: botón "Suscribirme" en Mi plan → checkout del proveedor → webhook (función en `api/`) que escribe `user_subscriptions`.
+- Poner precios a Plus y Pro (columna `price_ars` de `plans`).
+- Correr `supabase/migrations/2026-10-07-fase3-planes.sql` en Supabase de producción.
+- En Vercel, agregar `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` y `CRON_SECRET` (sin prefijo `VITE_`, así nunca llegan al navegador) para el job de borrado.
+- Prueba real: usuario free guarda 1 clip de 20 s → el segundo pedido se rechaza con aviso → alta manual a Plus → puede guardar de 1 min y descargar.
 
 **Fase 4 — Publicar y compartir.** Feed o galería de clips públicos, compartir por link, descarga habilitada según plan.
 
@@ -193,7 +239,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-07 (tarde):** Fase 1 cerrada (probada en producción por Agus). Fase 2 cerrada (en main, migración corrida y probada con cámara real por Agus, ver 6.2). Lo próximo es la **Fase 3** (suscripciones y paywall).
+**Actualizado 2026-10-07 (noche):** Fases 1 y 2 cerradas. Fase 3 en curso (ver 6.3): planes y límites hechos en código; falta elegir proveedor de pago, poner precios, correr la migración en producción y probar.
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 

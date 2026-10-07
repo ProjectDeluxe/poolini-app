@@ -1,8 +1,10 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { getMatchById, updateScore, sendCommand } from "../services/MatchService";
 import { useMatches } from "../context/MatchContext";
 import { supabase } from "../supabaseClient";
+import { usePlan } from "../plan/usePlan";
+import { planLimitMessage } from "../services/PlanService";
 import "./PartidaControl.css";
 
 export default function PartidaControl() {
@@ -18,6 +20,8 @@ export default function PartidaControl() {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [saving, setSaving]       = useState(null); // null | 20 | 40 | 60 (clip pedido, esperando que el agente lo cree)
   const [clipStatus, setClipStatus] = useState(null); // null | "processing" | "ready" | "error" (último clip de esta partida)
+  const [planLimit, setPlanLimit] = useState(null); // motivo si la base rechazó el clip por el plan
+  const { usage, plan, refresh: refreshPlan } = usePlan();
 
   // Carga inicial
   useEffect(() => {
@@ -103,12 +107,23 @@ export default function PartidaControl() {
 
   // Guardar clip en el perfil (save_clip) → el agente de la mesa recorta los
   // últimos N segundos, los sube a Storage y crea el clip para los dos jugadores.
+  // La base controla el límite del plan (Fase 3): si no alcanza, rechaza el pedido.
   async function handleSaveClip(durationSec) {
     if (saving) return;
     setSaving(durationSec);
+    setPlanLimit(null);
+    try {
+      await sendCommand(id, "save_clip", { duration_sec: durationSec });
+    } catch (err) {
+      setSaving(null);
+      const limitMsg = planLimitMessage(err);
+      if (limitMsg) setPlanLimit(limitMsg);
+      else setClipStatus("error");
+      return;
+    }
     setClipStatus("processing");
     setClipFlash(true);
-    await sendCommand(id, "save_clip", { duration_sec: durationSec });
+    refreshPlan();
     setTimeout(() => {
       setClipFlash(false);
       setSaving(null);
@@ -149,6 +164,7 @@ export default function PartidaControl() {
   const p1 = match.player1;
   const p2 = match.player2;
   const finished = match.status === "finished";
+  const clipsLeft = plan?.clips_per_month == null ? null : Math.max(0, plan.clips_per_month - (usage?.clips_used ?? 0));
 
   return (
     <div className={`ctrl-wrapper ${clipFlash ? "clip-flash" : ""}`}>
@@ -226,14 +242,17 @@ export default function PartidaControl() {
             ))}
           </div>
 
-          <p className="replay-label">Guardar clip en el perfil</p>
+          <p className="replay-label">
+            Guardar clip en el perfil
+            {clipsLeft != null && ` · te ${clipsLeft === 1 ? "queda 1" : `quedan ${clipsLeft}`} este mes`}
+          </p>
           <div className="replay-btns">
             {[20, 40, 60].map((sec) => (
               <button
                 key={sec}
                 className={`action-btn clip-btn replay-btn ${saving === sec ? "clipping" : ""}`}
                 onClick={() => handleSaveClip(sec)}
-                disabled={!!saving}
+                disabled={!!saving || clipsLeft === 0 || (plan?.max_clip_sec != null && sec > plan.max_clip_sec)}
               >
                 {saving === sec ? "✓ PEDIDO" : sec === 60 ? "💾 1 min" : `💾 ${sec}s`}
               </button>
@@ -244,6 +263,11 @@ export default function PartidaControl() {
               {clipStatus === "processing" && "Guardando clip…"}
               {clipStatus === "ready" && "✓ Clip guardado en el perfil"}
               {clipStatus === "error" && "No se pudo guardar el clip"}
+            </p>
+          )}
+          {(planLimit || clipsLeft === 0) && (
+            <p className="clip-status clip-status-error">
+              {planLimit ?? "Ya usaste los clips de este mes"} · <Link to="/plan">Ver planes</Link>
             </p>
           )}
 

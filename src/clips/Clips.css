@@ -73,3 +73,11 @@
   text-decoration: none;
   align-self: flex-start;
 }
+
+.clip-placeholder.clip-expired {
+  color: rgba(255,255,255,0.3);
+}
+
+.clip-download-locked {
+  color: rgba(255,255,255,0.5);
+}

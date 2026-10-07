@@ -1,0 +1,78 @@
+.plan-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.plan-error {
+  color: #ff7a7a;
+}
+
+.plan-current {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+
+.plan-current-name {
+  font-size: 1.2rem;
+  color: #50e090;
+}
+
+.plan-current-usage {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+}
+
+.plan-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.35);
+}
+
+.plan-card-current {
+  border-color: #50e090;
+}
+
+.plan-name {
+  font-size: 1rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.plan-price {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.7);
+}
+
+.plan-limits {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.6);
+}
+
+.plan-tag {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  color: #50e090;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.plan-btn {
+  align-self: flex-start;
+}
