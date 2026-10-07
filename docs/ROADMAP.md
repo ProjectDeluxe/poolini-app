@@ -2,7 +2,7 @@
 
 Documento vivo. Última actualización: 2026-10-07, a partir de la revisión del código existente y la definición de producto con Agus.
 
-> **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). Falta correr la migración contra Supabase de producción — ver sección 6.1.
+> **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). La migración ya se corrió en Supabase de producción y el código está en main; falta la prueba de punta a punta en producción — ver sección 6.1.
 >
 > **Actualización 2026-10-06 (noche):** primera prueba end-to-end real en producción — login, partida, y repetición en la tele funcionando de punta a punta por primera vez. Se descubrió y arregló que la base de datos de producción nunca había recibido el esquema completo (le faltaban tablas, columnas y permisos que el código ya daba por existentes) — ver sección 3.1 para el detalle completo de lo que se encontró y se arregló.
 >
@@ -147,7 +147,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 - `tables.device_id` de la sección 4 se invirtió: es `devices.table_id` (único), así una mesa tiene a lo sumo un dispositivo y reemplazar el mini-PC es solo crear otra fila.
 
 **Pendiente para cerrar la Fase 1:**
-- Correr `supabase/migrations/2026-10-07-fase1-clubs-mesas.sql` en Supabase de producción (SQL Editor → Run). Hasta que eso pase, la pantalla `/clubs` va a dar error y el selector de mesa queda vacío (la partida suelta sigue funcionando).
+- ~~Correr `supabase/migrations/2026-10-07-fase1-clubs-mesas.sql` en Supabase de producción~~ → hecho por Agus el 2026-10-07 (SQL Editor). Commit `25ff630` pusheado a main.
 - Probar en producción: crear un club, una mesa, una partida en esa mesa, y ver que aparece "Club · Mesa" en la pantalla de la partida.
 - El agente de repetición todavía no sabe a qué mesa pertenece (escucha todos los comandos). Asociarlo a su mesa vía `devices` es trabajo de la Fase 2 / sección 5.2.
 
@@ -161,7 +161,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-07:** la Fase 1 está escrita; falta correr la migración en producción y probarla (ver 6.1). Después de eso, sigue la **Fase 2** (piloto de grabación y repetición en una mesa), que ya tiene buena parte adelantada con el agente de OBS (sección 5).
+**Actualizado 2026-10-07:** la Fase 1 está escrita, la migración ya corrió en producción y el código está en main; falta probarla de punta a punta (ver 6.1). Después de eso, sigue la **Fase 2** (piloto de grabación y repetición en una mesa), que ya tiene buena parte adelantada con el agente de OBS (sección 5).
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 
