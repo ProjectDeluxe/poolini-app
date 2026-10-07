@@ -251,6 +251,23 @@
   letter-spacing: 1px;
 }
 
+/* Estado del último clip guardado */
+.clip-status {
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  text-align: center;
+  margin: 0;
+  color: rgba(255,255,255,0.5);
+}
+
+.clip-status-ready {
+  color: #50e090;
+}
+
+.clip-status-error {
+  color: #ff7a7a;
+}
+
 /* Botón finalizar */
 .end-btn {
   background: transparent;

@@ -1,7 +1,9 @@
 # PoolAppDeluxe — Roadmap y arquitectura (v1)
 
-Documento vivo. Última actualización: 2026-10-07, a partir de la revisión del código existente y la definición de producto con Agus.
+Documento vivo. Última actualización: 2026-10-07 (Fase 2), a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-07 (tarde):** Fase 1 probada por Agus en producción (ok). Fase 2 implementada en código: botón "Guardar clip" en el celu → el agente de la mesa recorta, sube a Supabase Storage y crea el clip → se ve en 🎬 Clips & Replays y en el perfil de los jugadores. El agente ahora se ata a su mesa (`TABLE_ID`). Falta correr la migración en producción y la prueba real con la cámara — ver sección 6.2.
+>
 > **Actualización 2026-10-07:** Fase 1 implementada en código (clubs, mesas, dispositivos, partidas vinculadas a una mesa, pantalla admin `/clubs`). La migración ya se corrió en Supabase de producción y el código está en main; falta la prueba de punta a punta en producción — ver sección 6.1.
 >
 > **Actualización 2026-10-06 (noche):** primera prueba end-to-end real en producción — login, partida, y repetición en la tele funcionando de punta a punta por primera vez. Se descubrió y arregló que la base de datos de producción nunca había recibido el esquema completo (le faltaban tablas, columnas y permisos que el código ya daba por existentes) — ver sección 3.1 para el detalle completo de lo que se encontró y se arregló.
@@ -51,8 +53,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 **Funciona de punta a punta, confirmado con una prueba real recién hoy:** login por SMS/OTP (Supabase Auth, con número y OTP de prueba configurados en Supabase mientras no haya proveedor de SMS real), CRUD de jugadores con avatar, flujo de partida completo (crear → QR → control desde el celu → marcador en tiempo real vía Supabase Realtime → finalizar con ganador, reflejado en vivo tanto en el celu como en la pantalla de la mesa), historial, repetición en la tele (ver 3.1 y 5.1), y estadísticas de winrate por jugador.
 
 **No implementado:**
-- `Clips.jsx` es un placeholder vacío. No existe grabación, ni almacenamiento, ni reproducción de video permanente (lo de hoy es repetición efímera, no guardado al perfil).
-- El botón "Guardar clip" inserta un comando en `realtime_commands` pero no hay ningún proceso (PC/mini-PC) escuchando esa tabla para generar el clip permanente — solo `mark_moment` (repetición) está conectado de punta a punta.
+- ~~`Clips.jsx` es un placeholder vacío / `save_clip` no tiene a nadie escuchando~~ → resuelto en la Fase 2 (2026-10-07, ver 6.2): guardado permanente al perfil vía el agente de la mesa.
 - `score_update` está en el schema de `realtime_commands` pero no se usa en ningún lado del código.
 - ~~No existe el concepto de club ni de mesa en el modelo de datos~~ → resuelto en la Fase 1 (2026-10-07, ver 6.1). Las partidas pueden seguir siendo "sueltas" (sin mesa) a propósito.
 - No hay suscripciones ni ningún tipo de cobro integrado.
@@ -101,7 +102,7 @@ Además, se sacó el botón de "guardar clip" del control del celu: por ahora la
 2. Cuando el celu manda un comando `mark_moment` con `payload.duration_sec` (20, 40 o 60), el agente le pide a OBS por WebSocket (`SaveReplayBuffer`) que vuelque el buffer a un archivo.
 3. El agente recorta con `ffmpeg` los últimos N segundos pedidos y lo deja disponible en una página local (`replay-display.html`) que se abre en pantalla completa en el navegador de la tele conectada por HDMI a esa PC.
 4. Como el celu nunca le habla directo a la PC de la mesa (todo pasa por Supabase, que es la nube), esto funciona aunque el celu esté en otra red distinta a la de esa PC — solo la PC de la mesa necesita tener internet para llegar a Supabase. Ver el `README.md` de esa carpeta para la puesta en marcha paso a paso.
-5. `save_clip` sigue existiendo en el schema (`realtime_commands.type`) para cuando se construya el guardado permanente / edición con IA, pero hoy no se usa desde ningún botón.
+5. `save_clip`: desde la Fase 2 (ver 6.2) lo manda el botón "Guardar clip en el perfil" del celu; el agente recorta, sube a Supabase Storage y crea la fila en `clips`. La edición/recorte con IA va a trabajar sobre esto mismo.
 6. Cuando llega `end_match`: cierra la grabación de esa mesa (hoy `PartidaControl` ya llama directo a `finishMatchById`; conviene unificarlo para que sea el agente el que reacciona al comando realtime, y sacar la llamada duplicada del cliente) — pendiente, no bloquea la prueba de hoy.
 7. **Storage** (para cuando se agregue el guardado permanente): evaluar Supabase Storage vs. algo más barato para video a escala como Cloudflare R2 o Backblaze B2 — con muchos clubes y clips esto es el costo variable más grande del negocio, vale la pena decidirlo antes de escalar, no después.
 8. **Borrado automático plan free** (a futuro, cuando exista guardado permanente): un job programado que borra del storage y marca como expirado cualquier clip de usuario free con `expires_at` vencido.
@@ -148,10 +149,40 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 **Pendiente para cerrar la Fase 1:**
 - ~~Correr `supabase/migrations/2026-10-07-fase1-clubs-mesas.sql` en Supabase de producción~~ → hecho por Agus el 2026-10-07 (SQL Editor). Commit `25ff630` pusheado a main.
-- Probar en producción: crear un club, una mesa, una partida en esa mesa, y ver que aparece "Club · Mesa" en la pantalla de la partida.
-- El agente de repetición todavía no sabe a qué mesa pertenece (escucha todos los comandos). Asociarlo a su mesa vía `devices` es trabajo de la Fase 2 / sección 5.2.
+- ~~Probar en producción: crear un club, una mesa, una partida en esa mesa, y ver que aparece "Club · Mesa" en la pantalla de la partida.~~ → probado por Agus el 2026-10-07, ok.
+- ~~El agente de repetición todavía no sabe a qué mesa pertenece~~ → resuelto en la Fase 2 con `TABLE_ID` (ver 6.2); el token propio vía `devices` sigue pendiente para la sección 5.2.
 
 **Fase 2 — Piloto de grabación y repetición en una sola mesa.** Construir el agente del mini-PC y probar el flujo completo (grabar → repetición en tele bajo pedido vía `mark_moment` → recortar/guardar vía `save_clip` → subir → ver el clip en el perfil) con un club/mesa de prueba, cámara cenital fija, sin todavía meter pagos ni límites. El objetivo es validar que la parte técnica más riesgosa (captura continua + repetición + recorte + upload, todo en el mismo mini-PC) funciona antes de invertir en escalarla.
+
+### 6.2 Fase 2 — qué se hizo (2026-10-07)
+
+**Hecho en código:**
+- `supabase/migrations/2026-10-07-fase2-clips.sql`: crea `clips` si producción no la tiene (posible, ver 3.1) y le agrega `club_id`, `table_id`, `command_id`, `storage_path`, `error_message`, y ya de paso `is_public`, `expires_at`, `downloaded_at` de la sección 4 para no migrar dos veces. Agrega `clips` a Realtime, asegura el bucket `clips` y su política de lectura. Idempotente; probada en Postgres local en tres casos (base con schema completo + datos, base tipo producción sin `clips` ni bucket, y desde cero), corrida dos veces, datos intactos.
+- `supabase-schema.sql` actualizado a v1.2 con lo mismo.
+- Agente (`agent/replay-agent/replay-agent.js`):
+  - Nuevo `save_clip`: crea el clip en `processing`, le pide a OBS el buffer, recorta los últimos N segundos en 720p (CRF 26, `+faststart` para que el navegador lo reproduzca sin bajarlo entero), genera miniatura, sube los dos a Storage (`clips/<match_id>/<clip_id>.mp4|.jpg`) y pasa el clip a `ready` (o `error` con el motivo).
+  - Nuevo `TABLE_ID` en el `.env`: si está, el agente solo reacciona a partidas de esa mesa y la marca `online` al arrancar / `offline` al cerrarse. Vacío = comportamiento de antes (cualquier partida).
+  - Marca los comandos que procesa como `processed = true`.
+  - Cola de pedidos en vez de una sola variable: si llegan repetición y clip seguidos, cada uno se resuelve en orden.
+- App:
+  - Control del celu: segunda fila "Guardar clip en el perfil" (20s / 40s / 1 min) con estado en vivo ("Guardando clip…" → "✓ Clip guardado").
+  - 🎬 Clips & Replays deja de ser placeholder: grilla de clips con reproductor, jugadores, club/mesa, fecha y botón de descarga.
+  - Perfil del jugador: sección "Clips" con los clips donde jugó.
+  - Clubs y mesas: botón "copiar ID" por mesa, para el `TABLE_ID` del agente.
+
+**Decisiones tomadas en el camino (cambiables):**
+- **Storage: Supabase Storage para el piloto** (sección 5, punto 7). Cambiar a R2/B2 se decide con datos reales de uso; el agente guarda `storage_path`, así migrar es mover archivos y reescribir URLs.
+- **Bucket público para el piloto:** los links son imposibles de adivinar pero quien tenga uno lo ve. Pasar a privado + links firmados cuando entre el paywall (Fase 3/4).
+- **Clip en 720p**: Supabase limita a 50 MB por archivo por defecto; 1 minuto en 720p CRF 26 debería quedar bastante por debajo (a confirmar con la cámara real).
+- **El clip es de la partida, no de un jugador**: aparece en el perfil de los dos. Quién "es dueño" (para límites del plan free) se define en la Fase 3.
+- **El agente sigue usando la service key** en la PC de Agus. El token propio por mesa (sección 5.2, tabla `devices`) queda para cuando haya agentes en PCs de clubes: `TABLE_ID` ya prepara el terreno.
+- **`end_match` sin cambios**: el cliente sigue finalizando la partida (ver sección 5, punto 6); no hacía falta para el piloto.
+
+**Pendiente para cerrar la Fase 2:**
+- Correr `supabase/migrations/2026-10-07-fase2-clips.sql` en Supabase de producción (SQL Editor).
+- Actualizar la carpeta del agente en la PC de la mesa y poner `TABLE_ID` en su `.env` (opcional para probar en casa).
+- Prueba real: partida en una mesa → repetición en la tele → "Guardar clip" → verlo y descargarlo en Clips y en el perfil. Anotar cuánto pesa un clip de 1 min con la cámara real.
+- Si el estado de la mesa queda `online` después de apagar la PC de golpe, es esperado: el monitoreo con `devices.last_seen_at` es de la Fase 5.
 
 **Fase 3 — Suscripciones y paywall.** Integrar Stripe (jugador y club), guardar el estado de suscripción en Supabase, aplicar los límites (cantidad de clips, descarga, publicar) en el cliente y reforzarlos con RLS. Sumar el job de borrado automático del plan free.
 
@@ -161,7 +192,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-07:** la Fase 1 está escrita, la migración ya corrió en producción y el código está en main; falta probarla de punta a punta (ver 6.1). Después de eso, sigue la **Fase 2** (piloto de grabación y repetición en una mesa), que ya tiene buena parte adelantada con el agente de OBS (sección 5).
+**Actualizado 2026-10-07 (tarde):** Fase 1 cerrada (probada en producción por Agus). Fase 2 escrita: falta correr su migración en producción y la prueba real con cámara (ver 6.2). Después sigue la **Fase 3** (suscripciones y paywall).
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 

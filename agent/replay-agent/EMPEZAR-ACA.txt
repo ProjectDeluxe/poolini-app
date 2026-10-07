@@ -39,6 +39,8 @@ PASOS (una sola vez):
      supabase.com -> tu proyecto -> Configuracion -> API.
      OJO: es la "service_role" key (secreta), no la que usa la app.
    - OBS_WS_PASSWORD: la contraseña del paso 3 (vacio si no le pusiste).
+   - TABLE_ID: en la app, entrar a Clubs y mesas y tocar "copiar ID" al
+     lado de la mesa de esta PC. Vacio = reacciona a cualquier partida.
    Guardar y cerrar.
 
 5. Doble click en "iniciar-agente.bat" (el archivo de esta misma carpeta).

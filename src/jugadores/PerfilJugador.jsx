@@ -1,14 +1,23 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { usePlayers } from "../context/PlayerContext";
 import { useMatches } from "../context/MatchContext";
 import { uploadAvatar } from "../services/PlayerService";
+import { getClipsByPlayer } from "../services/ClipService";
+import ClipList from "../clips/ClipList.jsx";
 
 export default function PerfilJugador() {
   const { id } = useParams();
   const { players, editPlayer } = usePlayers();
   const { matches } = useMatches();
 
+  const [clips, setClips] = useState([]);
+
   const player = players.find((p) => p.id === id);
+
+  useEffect(() => {
+    getClipsByPlayer(id).then(setClips).catch(() => setClips([]));
+  }, [id]);
 
   if (!player) return <p>Cargando jugador...</p>;
 
@@ -94,6 +103,9 @@ async function changeAvatar(event) {
     );
   })}
 </ul>
+
+<h3>Clips</h3>
+      <ClipList clips={clips} emptyText="Este jugador todavía no tiene clips guardados." />
 
       <Link to="/jugadores">
         <button className="btn">Volver</button>

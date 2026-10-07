@@ -1,5 +1,5 @@
 -- ============================================================
--- POOL APP DELUXE — Schema completo v1.1 (incluye Fase 1: clubs/mesas)
+-- POOL APP DELUXE — Schema completo v1.2 (incluye Fase 1: clubs/mesas y Fase 2: clips)
 -- Pegar en Supabase → SQL Editor → Run
 -- ============================================================
 
@@ -85,7 +85,15 @@ CREATE TABLE IF NOT EXISTS clips (
   duration_sec   INT,
   tags           TEXT[],
   status         TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'ready', 'error')),
-  created_at     TIMESTAMPTZ DEFAULT NOW()
+  created_at     TIMESTAMPTZ DEFAULT NOW(),
+  club_id        UUID REFERENCES clubs(id)  ON DELETE SET NULL,
+  table_id       UUID REFERENCES tables(id) ON DELETE SET NULL,
+  command_id     UUID,                 -- realtime_commands.id que lo pidió
+  storage_path   TEXT,                 -- ruta dentro del bucket 'clips'
+  error_message  TEXT,
+  is_public      BOOLEAN DEFAULT FALSE,
+  expires_at     TIMESTAMPTZ,          -- para el plan free (Fase 3)
+  downloaded_at  TIMESTAMPTZ
 );
 
 -- ============================================================
@@ -121,6 +129,9 @@ CREATE INDEX IF NOT EXISTS idx_matches_table_id     ON matches(table_id);
 CREATE INDEX IF NOT EXISTS idx_tables_club_id       ON tables(club_id);
 CREATE INDEX IF NOT EXISTS idx_clips_match_id       ON clips(match_id);
 CREATE INDEX IF NOT EXISTS idx_clips_status         ON clips(status);
+CREATE INDEX IF NOT EXISTS idx_clips_player1_id     ON clips(player1_id);
+CREATE INDEX IF NOT EXISTS idx_clips_player2_id     ON clips(player2_id);
+CREATE INDEX IF NOT EXISTS idx_clips_created_at     ON clips(created_at);
 CREATE INDEX IF NOT EXISTS idx_interactions_clip_id ON interactions(clip_id);
 CREATE INDEX IF NOT EXISTS idx_commands_match_id    ON realtime_commands(match_id);
 CREATE INDEX IF NOT EXISTS idx_commands_processed   ON realtime_commands(processed);
@@ -130,6 +141,7 @@ CREATE INDEX IF NOT EXISTS idx_commands_processed   ON realtime_commands(process
 -- ============================================================
 ALTER PUBLICATION supabase_realtime ADD TABLE realtime_commands;
 ALTER PUBLICATION supabase_realtime ADD TABLE matches;
+ALTER PUBLICATION supabase_realtime ADD TABLE clips;
 
 -- ============================================================
 -- STORAGE: bucket para videos y avatares

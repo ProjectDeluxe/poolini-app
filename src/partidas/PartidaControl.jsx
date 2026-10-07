@@ -16,6 +16,8 @@ export default function PartidaControl() {
   const [finishing, setFinishing] = useState(false);
   const [clipFlash, setClipFlash] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [saving, setSaving]       = useState(null); // null | 20 | 40 | 60 (clip pedido, esperando que el agente lo cree)
+  const [clipStatus, setClipStatus] = useState(null); // null | "processing" | "ready" | "error" (último clip de esta partida)
 
   // Carga inicial
   useEffect(() => {
@@ -32,6 +34,23 @@ export default function PartidaControl() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "matches", filter: `id=eq.${id}` },
         (payload) => setMatch((prev) => ({ ...prev, ...payload.new }))
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [id]);
+
+  // Realtime: el agente de la mesa crea el clip en 'processing' y lo pasa a
+  // 'ready' (o 'error') cuando termina de subirlo — así el celu sabe si quedó guardado.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`control-clips-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "clips", filter: `match_id=eq.${id}` },
+        (payload) => {
+          if (payload.new?.status) setClipStatus(payload.new.status);
+        }
       )
       .subscribe();
 
@@ -79,6 +98,20 @@ export default function PartidaControl() {
     setTimeout(() => {
       setClipFlash(false);
       setClipping(null);
+    }, 1500);
+  }
+
+  // Guardar clip en el perfil (save_clip) → el agente de la mesa recorta los
+  // últimos N segundos, los sube a Storage y crea el clip para los dos jugadores.
+  async function handleSaveClip(durationSec) {
+    if (saving) return;
+    setSaving(durationSec);
+    setClipStatus("processing");
+    setClipFlash(true);
+    await sendCommand(id, "save_clip", { duration_sec: durationSec });
+    setTimeout(() => {
+      setClipFlash(false);
+      setSaving(null);
     }, 1500);
   }
 
@@ -192,6 +225,27 @@ export default function PartidaControl() {
               </button>
             ))}
           </div>
+
+          <p className="replay-label">Guardar clip en el perfil</p>
+          <div className="replay-btns">
+            {[20, 40, 60].map((sec) => (
+              <button
+                key={sec}
+                className={`action-btn clip-btn replay-btn ${saving === sec ? "clipping" : ""}`}
+                onClick={() => handleSaveClip(sec)}
+                disabled={!!saving}
+              >
+                {saving === sec ? "✓ PEDIDO" : sec === 60 ? "💾 1 min" : `💾 ${sec}s`}
+              </button>
+            ))}
+          </div>
+          {clipStatus && (
+            <p className={`clip-status clip-status-${clipStatus}`}>
+              {clipStatus === "processing" && "Guardando clip…"}
+              {clipStatus === "ready" && "✓ Clip guardado en el perfil"}
+              {clipStatus === "error" && "No se pudo guardar el clip"}
+            </p>
+          )}
 
           {!confirmEnd ? (
             <button

@@ -1,0 +1,75 @@
+.clips-page {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.clips-empty,
+.clips-error {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.85rem;
+}
+
+.clips-error {
+  color: #ff7a7a;
+}
+
+.clips-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.clip-card {
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+
+.clip-video,
+.clip-placeholder {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+}
+
+.clip-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.75rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.clip-placeholder.clip-error {
+  color: #ff7a7a;
+}
+
+.clip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.clip-players {
+  font-size: 0.9rem;
+}
+
+.clip-meta {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.5);
+}
+
+.clip-download {
+  font-size: 0.75rem;
+  color: #50e090;
+  text-decoration: none;
+  align-self: flex-start;
+}

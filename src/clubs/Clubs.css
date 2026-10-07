@@ -103,3 +103,18 @@
   border-color: rgba(50, 200, 100, 0.5);
   color: #50e090;
 }
+
+.table-copy {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.6);
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.table-copy:hover {
+  color: white;
+  border-color: rgba(255,255,255,0.5);
+}

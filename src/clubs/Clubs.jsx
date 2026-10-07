@@ -9,6 +9,7 @@ export default function Clubs() {
   const [error, setError]       = useState(null);
   const [form, setForm]         = useState({ name: "", address: "", contact: "" });
   const [newLabels, setNewLabels] = useState({}); // club_id -> texto del input "nueva mesa"
+  const [copiedId, setCopiedId] = useState(null);
 
   async function loadClubs() {
     try {
@@ -57,6 +58,17 @@ export default function Clubs() {
   function handleDeleteClub(club) {
     if (!window.confirm(`¿Borrar el club "${club.name}" y todas sus mesas? Las partidas quedan, pero sin club.`)) return;
     run(() => deleteClub(club.id));
+  }
+
+  // El ID de la mesa va en el .env del agente de esa PC (TABLE_ID)
+  async function handleCopyId(table) {
+    try {
+      await navigator.clipboard.writeText(table.id);
+      setCopiedId(table.id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      window.prompt("Copiá el ID de la mesa para el TABLE_ID del agente:", table.id);
+    }
   }
 
   function handleDeleteTable(table) {
@@ -116,6 +128,9 @@ export default function Clubs() {
                 <li key={t.id} className="table-row">
                   <span>{t.label}</span>
                   <span className={`table-status table-${t.status}`}>{t.status}</span>
+                  <button className="table-copy" onClick={() => handleCopyId(t)} title="Copiar ID para el TABLE_ID del agente">
+                    {copiedId === t.id ? "✓ copiado" : "copiar ID"}
+                  </button>
                   <button className="action-danger" onClick={() => handleDeleteTable(t)} title="Borrar mesa">✕</button>
                 </li>
               ))}
