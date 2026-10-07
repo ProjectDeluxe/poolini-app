@@ -1,12 +1,14 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { getMatchById, updateScore, finishMatchById, sendCommand } from "../services/MatchService";
+import { getMatchById, updateScore, sendCommand } from "../services/MatchService";
+import { useMatches } from "../context/MatchContext";
 import { supabase } from "../supabaseClient";
 import "./PartidaControl.css";
 
 export default function PartidaControl() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { finishMatch } = useMatches();
 
   const [match, setMatch]         = useState(null);
   const [loading, setLoading]     = useState(true);
@@ -81,10 +83,17 @@ export default function PartidaControl() {
   }
 
   // Terminar partida
+  // OJO: antes esto llamaba a finishMatchById directo desde MatchService, lo
+  // cual actualizaba bien la base de datos pero nunca le avisaba al
+  // MatchContext (el que usa la pantalla de Historial) que tenía que
+  // refrescar su lista — por eso la partida quedaba marcada "en curso" en el
+  // historial aunque ya estuviera finalizada en Supabase. Usamos finishMatch
+  // del contexto en vez del service directo para que el historial se
+  // actualice solo apenas termina la partida.
   async function handleFinish(winnerId) {
     setFinishing(true);
     await sendCommand(id, "end_match", { winner_id: winnerId });
-    await finishMatchById(id, winnerId);
+    await finishMatch(id, winnerId);
     navigate("/historial");
   }
 

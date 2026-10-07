@@ -2,6 +2,8 @@
 
 Documento vivo. Última actualización: 2026-10-06, a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-06 (noche):** primera prueba end-to-end real en producción — login, partida, y repetición en la tele funcionando de punta a punta por primera vez. Se descubrió y arregló que la base de datos de producción nunca había recibido el esquema completo (le faltaban tablas, columnas y permisos que el código ya daba por existentes) — ver sección 3.1 para el detalle completo de lo que se encontró y se arregló.
+>
 > **Actualización 2026-10-06:** veredicto de escalabilidad del esquema actual (Supabase/Vercel/OBS) para producción masiva — ver sección 9.
 >
 > **Actualización 2026-09-27:** se define la estrategia de expansión a otros deportes (no solo pool) — ver sección 8.
@@ -42,18 +44,38 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - Moderación de contenido publicado públicamente (¿alguien revisa antes de publicar? ¿reporte de usuarios?).
 - Altura/ángulo de montaje de la cámara cenital según la altura típica de techo en un club (define el lente/campo de visión necesario para cubrir la mesa completa).
 
-## 3. Estado actual del código (auditoría 2026-09-01)
+## 3. Estado actual del código (auditoría 2026-09-01, corregida 2026-10-06)
 
-**Funciona de punta a punta:** login por SMS/OTP (Supabase Auth), CRUD de jugadores con avatar, flujo de partida completo (crear → QR → control desde el celu → marcador en tiempo real vía Supabase Realtime → finalizar con ganador), historial, y estadísticas de winrate por jugador.
+**Funciona de punta a punta, confirmado con una prueba real recién hoy:** login por SMS/OTP (Supabase Auth, con número y OTP de prueba configurados en Supabase mientras no haya proveedor de SMS real), CRUD de jugadores con avatar, flujo de partida completo (crear → QR → control desde el celu → marcador en tiempo real vía Supabase Realtime → finalizar con ganador, reflejado en vivo tanto en el celu como en la pantalla de la mesa), historial, repetición en la tele (ver 3.1 y 5.1), y estadísticas de winrate por jugador.
 
 **No implementado:**
-- `Clips.jsx` es un placeholder vacío. No existe grabación, ni almacenamiento, ni reproducción de video.
-- El botón "Guardar clip" inserta un comando en `realtime_commands` pero no hay ningún proceso (PC/mini-PC) escuchando esa tabla para generar el clip.
-- `mark_moment` y `score_update` están en el schema de `realtime_commands` pero no se usan en ningún lado del código.
+- `Clips.jsx` es un placeholder vacío. No existe grabación, ni almacenamiento, ni reproducción de video permanente (lo de hoy es repetición efímera, no guardado al perfil).
+- El botón "Guardar clip" inserta un comando en `realtime_commands` pero no hay ningún proceso (PC/mini-PC) escuchando esa tabla para generar el clip permanente — solo `mark_moment` (repetición) está conectado de punta a punta.
+- `score_update` está en el schema de `realtime_commands` pero no se usa en ningún lado del código.
 - No existe el concepto de club ni de mesa en el modelo de datos — todas las partidas son "sueltas".
 - No hay suscripciones ni ningún tipo de cobro integrado.
 
 **Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS son permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema).
+
+### 3.1 Lo que se encontró y se arregló en la primera puesta en marcha real (2026-10-06)
+
+Hasta hoy, el código nunca se había probado de punta a punta contra la base de datos de producción real con un login de verdad activo. Al hacerlo, aparecieron varios problemas — ninguno de diseño, todos de puesta en marcha — que vale la pena dejar anotados porque seguramente se repitan en la próxima instalación (un club nuevo) si no se automatizan:
+
+- **Mismatch de nombre de variable de entorno en Vercel:** el código espera `VITE_SUPABASE_KEY`, pero en Vercel la variable estaba cargada como `VITE_SUPABASE_ANON_KEY` — la app en producción corría sin key de Supabase sin que se notara a simple vista. Arreglado renombrando la variable en Vercel.
+- **Faltaba `vercel.json`:** sin la regla de reescritura de rutas para SPA, cualquier URL que no fuera la raíz (`/login`, `/partida/:id/control`, el link del QR) tiraba un 404 de Vercel al abrirse directo (por link o QR), aunque navegando con clicks dentro de la app funcionara bien. Se agregó `vercel.json` con el rewrite a `index.html`.
+- **La base de datos de producción nunca había recibido el `supabase-schema.sql` completo** — quedó claro que ese archivo se escribió y se subió a git, pero nadie lo corrió nunca contra el proyecto real de Supabase. Por tabla, lo que faltaba:
+  - `matches`: le faltaban las columnas `score1`, `score2`, `status`, `winner_id`, `started_at`, `finished_at`, `qr_token`, `notes` — se agregaron con `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`.
+  - `realtime_commands`: la tabla no existía — se creó entera, se le activó RLS, y se agregó a la publicación de Realtime (sin este último paso el agente de OBS nunca se entera de los comandos nuevos).
+  - `players` y `matches`: tenían RLS activado pero sin política de escritura — se agregó una política permisiva (`auth.role() = 'authenticated'`) a cada una, acorde a la decisión ya tomada de mantener el MVP permisivo.
+  - Importante: nada de esto borró datos existentes — los jugadores y partidas de prueba que parecían "perdidos" en el camino siempre estuvieron ahí, solo ocultos por la falta de política de lectura/escritura para esa sesión.
+- **Pipeline de video, dos bugs separados:**
+  - El recorte con `ffmpeg -c copy` cortaba en un punto del video que no coincidía con un keyframe, así que el clip resultante tenía audio pero no video (problema clásico de `-sseof` + stream copy). Se cambió a reencodear el recorte (`libx264` + `aac`, preset `ultrafast`) para garantizar que cada clip arranque con una imagen válida.
+  - Una vez resuelto eso, seguía sin verse imagen — resultó ser el **Modo de Estudio de OBS** activado: la Vista Previa mostraba la cámara bien, pero el Programa (lo único que realmente se graba) estaba en negro porque nunca se había hecho la transición. Se resolvió desactivando el Modo de Estudio (no hace falta para este caso de uso).
+  - Separado de eso, la Xbox Game Bar de Windows interfería con la captura de OBS — hay que desactivarla en cualquier PC nueva que se use para esto.
+  - El agente (`replay-agent.js`) no se reconectaba solo a OBS si la conexión se cortaba (por ejemplo, al reiniciar OBS durante una sesión) — quedaba "pensando" que seguía conectado y fallaba con `Not connected`. Se le agregó reconexión automática.
+- **Bug de sincronización en el cliente:** `PartidaControl.jsx` finalizaba la partida llamando directo a `finishMatchById` del service, sin pasar por `MatchContext` — la base de datos quedaba bien actualizada, pero la lista de partidas en memoria que usa `Historial.jsx` nunca se refrescaba, así que la partida seguía viéndose "en curso" hasta recargar la página entera. Se corrigió usando `finishMatch` del contexto (que sí dispara el refresco) en vez del service directo.
+
+**Conclusión práctica para la próxima mesa/club:** antes de dar por "lista" una instalación nueva, hay que confirmar explícitamente que (a) las variables de entorno en Vercel se llaman exactamente como el código las espera, (b) el `supabase-schema.sql` completo se corrió contra ESE proyecto de Supabase puntual, y (c) el Modo de Estudio y la Game Bar están apagados en la PC de cada mesa. Vale la pena, en algún momento, convertir el punto (b) en un script o checklist único en vez de ir tabla por tabla a mano como se hizo hoy.
 
 ## 4. Modelo de datos — qué hay que agregar
 

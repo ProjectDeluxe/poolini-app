@@ -39,23 +39,59 @@ const obs = new OBSWebSocket();
 let lastUpdate = 0;
 let pendingDuration = null;
 
+let obsConnected = false;
+
 async function connectOBS() {
   try {
     await obs.connect(OBS_WS_URL, OBS_WS_PASSWORD);
+    obsConnected = true;
     console.log("✅ Conectado a OBS WebSocket en", OBS_WS_URL);
   } catch (err) {
+    obsConnected = false;
     console.error("❌ No se pudo conectar a OBS (¿está abierto? ¿activaste el WebSocket Server en Herramientas?):", err.message);
     console.log("   Reintentando en 5s...");
     setTimeout(connectOBS, 5000);
   }
 }
 
+// Si OBS se cierra o se reinicia, la conexión se cae — antes el agente se
+// quedaba "pensando" que seguía conectado y cualquier botón de repetición
+// fallaba con "Not connected" hasta reiniciar el agente a mano. Ahora, apenas
+// se detecta el corte, reintenta solo cada 5s hasta reconectar.
+obs.on("ConnectionClosed", () => {
+  if (!obsConnected) return; // ya estábamos reintentando, no dupliques el loop
+  obsConnected = false;
+  console.log("⚠️  Se perdió la conexión con OBS (¿se cerró o reinició?). Reintentando en 5s...");
+  setTimeout(connectOBS, 5000);
+});
+
 function trimLastSeconds(inputPath, seconds, outputPath) {
   return new Promise((resolve, reject) => {
-    // -sseof: arranca la lectura N segundos antes del final del archivo
+    // -sseof: arranca la lectura N segundos antes del final del archivo.
+    //
+    // OJO: antes usábamos "-c copy" (copiar el video tal cual, sin reprocesar).
+    // Eso es rápido pero el corte solo puede empezar en un "keyframe" del video
+    // original — si el punto de corte cae entre keyframes (lo más común), el
+    // archivo resultante queda sin un keyframe inicial válido y la mayoría de
+    // los reproductores (incluido el <video> del navegador) no muestran nada
+    // de imagen hasta el próximo keyframe, aunque el audio sí se escucha bien
+    // desde el principio. Por eso se oía el audio pero no se veía el video.
+    //
+    // La solución es reencodear el recorte (quitamos "-c copy" del video) para
+    // que el clip arranque siempre con un keyframe propio. Con "ultrafast" el
+    // reencode de 20-60s tarda nada más que un par de segundos en cualquier PC.
     execFile(
       "ffmpeg",
-      ["-y", "-sseof", `-${seconds}`, "-i", inputPath, "-c", "copy", outputPath],
+      [
+        "-y",
+        "-sseof", `-${seconds}`,
+        "-i", inputPath,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "23",
+        "-c:a", "aac",
+        outputPath,
+      ],
       (err) => (err ? reject(err) : resolve())
     );
   });
