@@ -50,6 +50,13 @@ export async function createTable(club_id, label) {
   return data;
 }
 
+// Abrir/cerrar la mesa para que se pueda arrancar una partida escaneando su QR
+// availability: 'closed' | 'waiting' (la pasa a 'in_match' la base al arrancar)
+export async function setTableAvailability(id, availability) {
+  const { error } = await supabase.from("tables").update({ availability }).eq("id", id);
+  if (error) throw error;
+}
+
 export async function deleteTable(id) {
   const { error } = await supabase.from("tables").delete().eq("id", id);
   if (error) throw error;

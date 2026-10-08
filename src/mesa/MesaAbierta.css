@@ -1,0 +1,56 @@
+.mesa-page {
+  max-width: 420px;
+  margin: 0 auto;
+  font-family: 'Orbitron', sans-serif;
+}
+
+.mesa-club {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.6);
+}
+
+.mesa-label {
+  margin-top: 4px;
+}
+
+.mesa-msg,
+.mesa-hint {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.8rem;
+}
+
+.mesa-entry,
+.mesa-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mesa-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+
+.mesa-form input,
+.mesa-form select {
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+}
+
+.mesa-field select,
+.mesa-field input {
+  flex: 1;
+}
+
+.mesa-error {
+  color: #ff7a7a;
+  font-size: 0.8rem;
+}

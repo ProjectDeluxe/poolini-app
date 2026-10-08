@@ -15,6 +15,7 @@ import PartidaControl from "./partidas/PartidaControl.jsx";
 import PerfilJugador from "./jugadores/PerfilJugador.jsx";
 import Clubs from "./clubs/Clubs.jsx";
 import Plan from "./plan/Plan.jsx";
+import MesaAbierta from "./mesa/MesaAbierta.jsx";
 
 import { PlayerProvider } from "./context/PlayerContext";
 import { MatchProvider } from "./context/MatchContext";
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
             <Routes>
               {/* Pública */}
               <Route path="/login" element={<Login />} />
+              <Route path="/mesa/:token" element={<MesaAbierta />} />
 
               {/* Protegidas */}
               {/* Sin pantalla de inicio: los accesos ya están en la barra lateral */}

@@ -6,6 +6,7 @@ import { uploadAvatar } from "../services/PlayerService";
 import { getClipsByPlayer } from "../services/ClipService";
 import ClipList from "../clips/ClipList.jsx";
 import { usePlan } from "../plan/usePlan";
+import { useAuth } from "../context/AuthContext";
 
 export default function PerfilJugador() {
   const { id } = useParams();
@@ -14,6 +15,7 @@ export default function PerfilJugador() {
 
   const [clips, setClips] = useState([]);
   const { plan } = usePlan();
+  const { account } = useAuth();
 
   const player = players.find((p) => p.id === id);
 
@@ -22,6 +24,12 @@ export default function PerfilJugador() {
   }, [id]);
 
   if (!player) return <p>Cargando jugador...</p>;
+
+  // Quién puede editar este jugador (lo mismo que permite la base, Fase 3)
+  const canEdit =
+    !!account?.is_admin ||
+    (player.user_id && player.user_id === account?.player?.user_id) ||
+    (!player.user_id && (account?.clubs ?? []).some((c) => c.id === player.club_id));
 
   // ---- Estadísticas reales ----
 
@@ -74,7 +82,7 @@ async function changeAvatar(event) {
     style={{ borderRadius: "50%", marginBottom: "10px" }}
     />
 
-    <input type="file" accept="image/*" onChange={changeAvatar} />
+    {canEdit && <input type="file" accept="image/*" onChange={changeAvatar} />}
 
       <h2>{player.name}</h2>
 

@@ -14,8 +14,9 @@ export function PlayerProvider({ children }) {
     setLoading(false);
   }
 
-async function addPlayer(name, avatar_url = null) {
-  await createPlayer(name, avatar_url);
+// fields: { club_id, phone } — jugador de un club (Fase 3); sin club solo lo puede crear el admin
+async function addPlayer(name, avatar_url = null, fields = {}) {
+  await createPlayer(name, avatar_url, fields);
   await loadPlayers(); // ← refresca desde Supabase
 }
 
@@ -36,7 +37,7 @@ async function addPlayer(name, avatar_url = null) {
   }, []);
 
   return (
-    <PlayerContext.Provider value={{ players, loading, addPlayer, editPlayer, removePlayer }}>
+    <PlayerContext.Provider value={{ players, loading, addPlayer, editPlayer, removePlayer, reloadPlayers: loadPlayers }}>
       {children}
     </PlayerContext.Provider>
   );

@@ -1,7 +1,9 @@
 # PoolAppDeluxe — Roadmap y arquitectura (v1)
 
-Documento vivo. Última actualización: 2026-10-07 (Fase 3), a partir de la revisión del código existente y la definición de producto con Agus.
+Documento vivo. Última actualización: 2026-10-08 (Fase 3, cuentas), a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-08:** antes de seguir con el cobro, se define el modelo de cuentas: club, jugador e invitado sobre un solo sistema de permisos. Implementado en código (migración, mesas abiertas con QR fijo, reclamo de jugador por celu con confirmación, panel del club) — ver sección 6.4. Planes y límites (6.3) en main desde el commit `5787987`.
+>
 > **Actualización 2026-10-08:** dos ajustes de UI fuera de las fases. Se sacó la pantalla de inicio (repetía los accesos de la barra lateral) y `/` ahora lleva a 📊 Historial; cuando exista "mi jugador" (modelo de cuentas, 6.4) se puede reconsiderar llevar al perfil propio. Además, 🔍 en la barra busca jugadores por nombre (sin distinguir mayúsculas) y lleva a su perfil. La búsqueda de clubs queda afuera a propósito: no hay todavía una página pública de club a la que llevar.
 >
 > **Actualización 2026-10-07 (noche):** Fase 3 arrancada. Hecha la parte que no depende del proveedor de pago: planes (free/plus/pro) con sus límites en la base, límite de clips aplicado por la base al tocar "Guardar clip", pantalla 💳 Mi plan, descarga solo con plan pago, y job diario que borra los clips vencidos del plan free. Medido: un clip de 1 minuto pesa ~2,6 MB. Falta elegir proveedor de pago (Stripe no opera con comercios argentinos) y los precios — ver sección 6.3.
@@ -49,6 +51,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - Presupuesto/target de costo por mesa para el hardware (mini-PC + cámara + tele si aplica).
 - Precio de los planes (jugador y club). La estructura de planes ya está (sección 6.3); faltan los montos.
 - Proveedor de pago: Mercado Pago vs. Stripe (sección 6.3).
+- Límites de los planes de club: cuántas mesas y cuántos jugadores propios (sección 6.4; por ahora un solo plan sin límites).
 - Si el club tiene un panel de administración propio (ver mesas activas, jugadores frecuentes) como parte del plan pago del club.
 - Moderación de contenido publicado públicamente (¿alguien revisa antes de publicar? ¿reporte de usuarios?).
 - Altura/ángulo de montaje de la cámara cenital según la altura típica de techo en un club (define el lente/campo de visión necesario para cubrir la mesa completa).
@@ -63,7 +66,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - ~~No existe el concepto de club ni de mesa en el modelo de datos~~ → resuelto en la Fase 1 (2026-10-07, ver 6.1). Las partidas pueden seguir siendo "sueltas" (sin mesa) a propósito.
 - No hay cobro online integrado. Desde la Fase 3 (ver 6.3) existen los planes y sus límites; el plan pago se activa a mano mientras no haya proveedor de pago.
 
-**Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS son permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema).
+**Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS eran permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema); desde la Fase 3 ya no lo son en `players`, `clubs`, `tables`, `clips` y `realtime_commands`, y siguen abiertas `matches` e `interactions` (Fase 5).
 
 ### 3.1 Lo que se encontró y se arregló en la primera puesta en marcha real (2026-10-06)
 
@@ -235,13 +238,55 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 - En Vercel, agregar `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` y `CRON_SECRET` (sin prefijo `VITE_`, así nunca llegan al navegador) para el job de borrado.
 - Prueba real: usuario free guarda 1 clip de 20 s → el segundo pedido se rechaza con aviso → alta manual a Plus → puede guardar de 1 min y descargar.
 
+### 6.4 Fase 3 — modelo de cuentas: club, jugador e invitado (2026-10-08)
+
+**Por qué antes del cobro:** hasta acá la única cuenta real era la de Agus (admin) y cualquier logueado podía crear jugadores, clubs y mesas. Agus pidió cerrar primero la distinción entre club, jugador e invitado, para que el cobro (jugador y club) se apoye en el mismo modelo de permisos en vez de dos sistemas en paralelo. Propuesta discutida: `/mnt/project-files/fase3/modelo-de-cuentas.md` (fuera del repo).
+
+**Decisiones (Agus aprobó las cinco recomendaciones):**
+- **Toda persona es un usuario de Supabase Auth, también el invitado** (sesión anónima). El "tipo de cuenta" no es un campo `role`: sale de las relaciones. Tener un `players.user_id` propio te hace jugador; figurar en `club_members` te hace cuenta de club; tener una sesión anónima te hace invitado. Así el dueño de un club también puede jugar.
+- **Reclamar por celu, con confirmación:** si un jugador sin dueño (cargado por un club o como invitado) tiene el mismo celu con el que alguien entra por OTP, la app pregunta "Este número ya tiene partidas jugadas como Juan, ¿sos vos?" antes de unir el historial (pedido de Agus, para el caso de un celu compartido o mal cargado). Se comparan los últimos 10 dígitos, así coinciden "+54 9 11 …" y "11 …". El formato con "15" no coincide y hay que vincularlo a mano.
+- **Disponibilidad de la mesa aparte de `status`:** `status` (online/offline) es de la PC y lo pone el agente; `availability` (`closed`/`waiting`/`in_match`) es del club. Si fueran una sola columna, el agente pisaría lo que pone el club.
+- **Planes de club:** un solo catálogo `plans` con `audience` (`player`/`club`) y límites `max_tables`/`max_club_players`. Arranca un plan `club` sin límites hasta tener un club real.
+- **Google login:** después del piloto. No cambia el modelo, porque es otro método de login del mismo usuario.
+
+**Hecho en código:**
+- `supabase/migrations/2026-10-07-fase3-cuentas.sql`. Es idempotente y tolera tablas a medias. Se probó en Postgres local sobre tres bases (schema completo, tipo producción con tablas a medias, y desde cero), corrida dos veces cada una con los datos intactos, y se probaron los permisos de cada rol:
+  - `profiles` (una por usuario, se crea sola al registrarse; `is_admin`).
+  - `club_members` (`owner`/`staff`).
+  - En `players`: `user_id`, `club_id`, `is_guest` y `created_by`.
+  - En `tables`: `qr_token` fijo y `availability`.
+  - En `plans`: `audience`, `max_tables` y `max_club_players`, más el plan `club`.
+  - En `club_subscriptions`: `plan_id`.
+  - Funciones de permisos `is_admin()`, `is_club_member()`, `my_player_id()` y `plan_for_club()`, usadas por la RLS nueva de `players`, `clubs`, `tables`, `profiles` y `club_members`.
+  - Mi jugador: `claimable_players()` + `claim_player()` (el reclamo) y `create_my_player()`.
+  - Mesa abierta: `table_by_qr()` y `start_match_at_table()`. Esta última bloquea la fila de la mesa, así dos celus a la vez no crean dos partidas; la mesa pasa a `in_match` y vuelve a `waiting` sola cuando termina la partida.
+  - Admin: `add_club_member_by_phone()` (dar la cuenta de un club por celu).
+  - Triggers: nadie se adueña de un jugador por fuera de esas funciones, límites del plan de club, y los invitados anónimos no guardan clips.
+- `supabase-schema.sql` v1.4 con lo mismo.
+- App:
+  - `/mesa/:token`: la página del QR. Muestra club y mesa, y deja entrar con el celu o como invitado. Se elige rival (existente o invitado nuevo con celu opcional) y arranca la partida.
+  - Arriba de cualquier pantalla (ya no hay pantalla de inicio): la primera vez que alguien entra con su celu crea su jugador o confirma el reclamo.
+  - Clubs y mesas: el admin ve todo y da acceso a un club por celu; una cuenta de club ve solo lo suyo. Por mesa hay botón abrir/cerrar y QR para imprimir. 🏢 solo aparece para admin y cuentas de club.
+  - Jugadores: crear y borrar solo admin o club, con celu opcional para el reclamo. El avatar solo lo cambia quien puede editar.
+  - Un invitado que después entra con su celu convierte la misma sesión en cuenta (`updateUser` + OTP `phone_change`). Si ese celu ya tenía cuenta, entra a la existente.
+
+**Decisiones tomadas en el camino (cambiables):**
+- Las partidas siguen pudiendo crearse "a mano" por cualquier logueado (`NuevaPartida`); la RLS de `matches` queda abierta hasta la Fase 5.
+- Un jugador con cuenta no puede borrar su jugador (solo admin), para no romper historial ajeno.
+- Si se vuelve a correr la migración de planes, hay que correr después la de cuentas: la de planes reescribe el control de clips sin la regla de invitados.
+
+**Pendiente para cerrar esta parte:**
+- Correr en producción, en orden: `2026-10-07-fase3-planes.sql` y después `2026-10-07-fase3-cuentas.sql`. Después, marcarse admin con el `UPDATE profiles …` que está en el encabezado de la migración. **Sin ese paso, Agus pierde el acceso a 🏢 y a crear jugadores.**
+- Supabase → Authentication → Sign In / Providers: activar **Anonymous sign-ins** (viene apagado). Activar también el CAPTCHA de Auth antes de abrir mesas en un club real: hoy el único freno a crear sesiones anónimas en loop es el límite por IP que trae Supabase (pedido de Agus: anotar el rate-limit para cuando haya mesas reales).
+- Prueba real: abrir una mesa, escanear el QR desde otro celu como invitado, jugar y terminar (la mesa vuelve a "abierta"). Después cargar un jugador de club con un celu y entrar con ese celu para confirmar el reclamo.
+
 **Fase 4 — Publicar y compartir.** Feed o galería de clips públicos, compartir por link, descarga habilitada según plan.
 
 **Fase 5 — Endurecer para producción real.** Ajustar las políticas RLS (hoy abiertas a "cualquier autenticado"), moderación de contenido público, monitoreo de mini-PCs (saber si una cámara se cayó), limpieza del código muerto y validaciones pendientes del punto 3.
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-07 (noche):** Fases 1 y 2 cerradas. Fase 3 en curso (ver 6.3): planes y límites hechos en código; falta elegir proveedor de pago, poner precios, correr la migración en producción y probar.
+**Actualizado 2026-10-08:** Fases 1 y 2 cerradas. Fase 3 en curso: planes y límites en main (6.3); modelo de cuentas hecho en código (6.4). Falta correr las dos migraciones en producción y probar; después, elegir proveedor de pago, poner precios y sumar el cobro encima de este modelo.
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 

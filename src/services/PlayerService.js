@@ -16,12 +16,12 @@ export async function getPlayers() {
   return data;
 }
 
-export async function createPlayer(name, avatar_url = null) {
+export async function createPlayer(name, avatar_url = null, fields = {}) {
   console.log("CREATE PLAYER...", name);
 
   const { data, error } = await supabase
     .from("players")
-    .insert({ name, avatar_url })
+    .insert({ name, avatar_url, ...fields })
     .select()
     .single();
 
