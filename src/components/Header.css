@@ -161,3 +161,87 @@
 }
 
 
+
+/* === Buscador de jugadores === */
+.player-search {
+  position: relative;
+}
+
+.search-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.search-panel {
+  position: absolute;
+  left: 52px;
+  top: -8px;
+  width: 260px;
+  padding: 10px;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid rgba(255,255,255,0.25);
+  z-index: 1001;
+  text-align: left;
+}
+
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+}
+
+.search-results {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 4px;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.search-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.search-empty {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.5);
+}
+
+@media (max-width: 768px) {
+  /* En el celu la barra va abajo: el panel se abre hacia arriba */
+  .search-panel {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    top: auto;
+    bottom: 68px;
+    width: auto;
+  }
+}

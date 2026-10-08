@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import PlayerSearch from "./PlayerSearch.jsx";
 import "./Header.css";
 
 export default function Header() {
@@ -17,10 +18,10 @@ export default function Header() {
 
       <nav className="nav">
         <Link to="/clips" className="icon-btn" title="Clips">🎬</Link>
-        <Link to="/" className="icon-btn" title="Inicio">🏠</Link>
         <Link to="/partida/nueva" className="icon-btn" title="Nueva partida">🎱</Link>
         <Link to="/historial" className="icon-btn" title="Historial">📊</Link>
         <Link to="/jugadores" className="icon-btn" title="Jugadores">👤</Link>
+        {user && <PlayerSearch />}
         <Link to="/clubs" className="icon-btn" title="Clubs y mesas">🏢</Link>
         <Link to="/plan" className="icon-btn" title="Mi plan">💳</Link>
       </nav>

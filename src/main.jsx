@@ -3,7 +3,6 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Layout from "./Layout.jsx";
-import App from "./App.jsx";
 import Login from "./auth/Login.jsx";
 
 import NuevaPartida from "./partidas/NuevaPartida.jsx";
@@ -33,7 +32,8 @@ ReactDOM.createRoot(document.getElementById("root")).render(
               <Route path="/login" element={<Login />} />
 
               {/* Protegidas */}
-              <Route path="/" element={<ProtectedRoute><App /></ProtectedRoute>} />
+              {/* Sin pantalla de inicio: los accesos ya están en la barra lateral */}
+              <Route path="/" element={<Navigate to="/historial" replace />} />
               <Route path="/partida/nueva" element={<ProtectedRoute><NuevaPartida /></ProtectedRoute>} />
               <Route path="/partida/:id" element={<ProtectedRoute><Partida /></ProtectedRoute>} />
               <Route path="/partida/:id/control" element={<ProtectedRoute><PartidaControl /></ProtectedRoute>} />

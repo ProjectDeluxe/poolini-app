@@ -2,6 +2,8 @@
 
 Documento vivo. Última actualización: 2026-10-07 (Fase 3), a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-08:** dos ajustes de UI fuera de las fases. Se sacó la pantalla de inicio (repetía los accesos de la barra lateral) y `/` ahora lleva a 📊 Historial; cuando exista "mi jugador" (modelo de cuentas, 6.4) se puede reconsiderar llevar al perfil propio. Además, 🔍 en la barra busca jugadores por nombre (sin distinguir mayúsculas) y lleva a su perfil. La búsqueda de clubs queda afuera a propósito: no hay todavía una página pública de club a la que llevar.
+>
 > **Actualización 2026-10-07 (noche):** Fase 3 arrancada. Hecha la parte que no depende del proveedor de pago: planes (free/plus/pro) con sus límites en la base, límite de clips aplicado por la base al tocar "Guardar clip", pantalla 💳 Mi plan, descarga solo con plan pago, y job diario que borra los clips vencidos del plan free. Medido: un clip de 1 minuto pesa ~2,6 MB. Falta elegir proveedor de pago (Stripe no opera con comercios argentinos) y los precios — ver sección 6.3.
 >
 > **Actualización 2026-10-07 (tarde):** Fase 1 probada por Agus en producción (ok). Fase 2 implementada en código: botón "Guardar clip" en el celu → el agente de la mesa recorta, sube a Supabase Storage y crea el clip → se ve en 🎬 Clips & Replays y en el perfil de los jugadores. El agente ahora se ata a su mesa (`TABLE_ID`). Migración corrida en producción y prueba real con cámara ok: Fase 2 cerrada — ver sección 6.2.

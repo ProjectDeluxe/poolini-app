@@ -80,3 +80,17 @@ export async function uploadAvatar(file, playerId) {
   return publicUrlData.publicUrl;
 }
 
+// Búsqueda por nombre, sin distinguir mayúsculas (buscador del Header)
+export async function searchPlayers(text, limit = 8) {
+  // % y _ son comodines de ILIKE: se escapan para buscar el texto tal cual
+  const escaped = text.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const { data, error } = await supabase
+    .from("players")
+    .select("id, name, avatar_url")
+    .ilike("name", `%${escaped}%`)
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  if (error) throw error;
+  return data ?? [];
+}
