@@ -5,8 +5,11 @@
 //   2. Cuando el celu inserta un comando `mark_moment` (botón 20s/40s/1min del control),
 //      le pide a OBS por WebSocket que guarde el Replay Buffer.
 //   3. Recorta con ffmpeg los últimos N segundos pedidos.
-//   4. Sirve el resultado en una página local (replay-display.html) que se abre
-//      en el navegador, en pantalla completa, en la tele conectada por HDMI a esta PC.
+//   4. Sirve una página local (replay-display.html) para la tele conectada por HDMI
+//      a esta PC: muestra la mesa en vivo todo el tiempo (desde la cámara virtual
+//      de OBS) y, cuando hay una repetición nueva, la pasa en esa misma pantalla
+//      y vuelve solo al vivo. En Windows el agente abre esa página solo, en
+//      pantalla completa.
 //   5. Cuando llega un `save_clip` (botón "Guardar clip" del control), hace lo mismo
 //      pero en vez de mostrarlo en la tele lo sube a Supabase Storage (bucket `clips`)
 //      y crea la fila en la tabla `clips`, así aparece en el perfil de los jugadores.
@@ -20,7 +23,7 @@ require("dotenv").config();
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const OBSWebSocket = require("obs-websocket-js").default;
@@ -32,6 +35,10 @@ const TABLE_ID = (process.env.TABLE_ID || "").trim();
 const OBS_WS_URL = process.env.OBS_WS_URL || "ws://127.0.0.1:4455";
 const OBS_WS_PASSWORD = process.env.OBS_WS_PASSWORD || undefined;
 const PORT = Number(process.env.PORT || 5051);
+// Abrir la pantalla de la tele al arrancar (solo Windows). ABRIR_TELE=0 lo desactiva.
+const OPEN_DISPLAY = (process.env.ABRIR_TELE || "1").trim() !== "0";
+// Posición de la ventana de la tele, por ejemplo "1920,0" si la tele es la segunda pantalla.
+const DISPLAY_POSITION = (process.env.TELE_POSICION || "").trim();
 
 const PUBLIC_DIR = path.join(__dirname, "public");
 const OUTPUT_FILE = path.join(PUBLIC_DIR, "replay-latest.mp4");
@@ -59,6 +66,7 @@ async function connectOBS() {
     await obs.connect(OBS_WS_URL, OBS_WS_PASSWORD);
     obsConnected = true;
     console.log("✅ Conectado a OBS WebSocket en", OBS_WS_URL);
+    await ensureOBSOutputs();
   } catch (err) {
     obsConnected = false;
     console.error("❌ No se pudo conectar a OBS (¿está abierto? ¿activaste el WebSocket Server en Herramientas?):", err.message);
@@ -77,6 +85,63 @@ obs.on("ConnectionClosed", () => {
   console.log("⚠️  Se perdió la conexión con OBS (¿se cerró o reinició?). Reintentando en 5s...");
   setTimeout(connectOBS, 5000);
 });
+
+// La repetición necesita el Replay Buffer corriendo, y el vivo de la tele toma la
+// imagen de la cámara virtual de OBS. Si alguno está apagado, se prende solo.
+async function ensureOBSOutputs() {
+  try {
+    const { outputActive } = await obs.call("GetReplayBufferStatus");
+    if (!outputActive) {
+      await obs.call("StartReplayBuffer");
+      console.log("✅ Buffer de repetición iniciado");
+    }
+  } catch (err) {
+    console.error("⚠️  No pude iniciar el buffer de repetición de OBS:", err.message);
+    console.error("   Revisá: Configuración → Salida → pestaña 'Buffer de repetición' → activado.");
+  }
+  try {
+    const { outputActive } = await obs.call("GetVirtualCamStatus");
+    if (!outputActive) {
+      await obs.call("StartVirtualCam");
+      console.log("✅ Cámara virtual de OBS iniciada (la usa la tele para el vivo)");
+    }
+  } catch (err) {
+    console.error("⚠️  No pude iniciar la cámara virtual de OBS, la tele no va a mostrar el vivo:", err.message);
+    console.error("   Probá apretando 'Iniciar cámara virtual' en OBS (hace falta OBS 26.1 o más nuevo).");
+  }
+}
+
+// Busca Chrome o Edge en las carpetas de instalación habituales de Windows.
+function findBrowser() {
+  const roots = [process.env.PROGRAMFILES, process.env["PROGRAMFILES(X86)"], process.env.LOCALAPPDATA].filter(Boolean);
+  const candidates = [];
+  for (const root of roots) candidates.push(path.join(root, "Google", "Chrome", "Application", "chrome.exe"));
+  for (const root of roots) candidates.push(path.join(root, "Microsoft", "Edge", "Application", "msedge.exe"));
+  return candidates.find((p) => fs.existsSync(p));
+}
+
+// Abre la pantalla de la tele en pantalla completa, con un perfil de navegador
+// propio para que los permisos de abajo valgan aunque haya otro Chrome abierto:
+// autoplay con sonido para las repeticiones y permiso de cámara sin preguntar.
+function openDisplay(url) {
+  if (!OPEN_DISPLAY || process.platform !== "win32") return;
+  const browser = findBrowser();
+  if (!browser) {
+    console.log("ℹ️  No encontré Chrome ni Edge para abrir la tele solo; abrí la dirección de arriba a mano.");
+    return;
+  }
+  const args = [
+    "--kiosk",
+    `--user-data-dir=${path.join(os.homedir(), "AppData", "Local", "PoolAppDeluxe", "tele")}`,
+    "--autoplay-policy=no-user-gesture-required",
+    "--use-fake-ui-for-media-stream",
+    "--no-first-run",
+  ];
+  if (DISPLAY_POSITION) args.push(`--window-position=${DISPLAY_POSITION}`);
+  args.push(url);
+  spawn(browser, args, { detached: true, stdio: "ignore" }).unref();
+  console.log("📺 Abrí la pantalla de la tele (para salir de la pantalla completa: Alt+F4).");
+}
 
 function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
@@ -348,9 +413,11 @@ async function main() {
   const app = express();
   app.use(express.static(PUBLIC_DIR));
   app.get("/status", (req, res) => res.json({ lastUpdate }));
-  app.listen(PORT, () =>
-    console.log(`\n🖥  Abrí esto en el navegador de la tele, en pantalla completa:\n   http://localhost:${PORT}/replay-display.html\n`)
-  );
+  const displayUrl = `http://localhost:${PORT}/replay-display.html`;
+  app.listen(PORT, () => {
+    console.log(`\n🖥  Pantalla de la tele (vivo + repeticiones):\n   ${displayUrl}\n`);
+    openDisplay(displayUrl);
+  });
 }
 
 // Al cerrar el agente (Ctrl+C o cerrar la ventana negra) la mesa vuelve a 'offline'.

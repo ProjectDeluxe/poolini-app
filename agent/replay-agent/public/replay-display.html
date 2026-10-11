@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>PoolAppDeluxe — Repetición</title>
+  <title>PoolAppDeluxe — Mesa en vivo</title>
   <style>
     html, body {
       margin: 0;
@@ -10,58 +10,234 @@
       background: #000;
       height: 100%;
       overflow: hidden;
+      cursor: none;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
     }
     video {
+      position: absolute;
+      top: 0; left: 0;
       width: 100%;
       height: 100%;
       object-fit: contain;
       background: #000;
     }
+    #replay { visibility: hidden; }
+    body.on-replay #replay { visibility: visible; }
+    body.on-replay #live { visibility: hidden; }
+
+    /* Etiqueta de la esquina: EN VIVO / REPETICIÓN */
+    .badge {
+      position: absolute;
+      top: 3vh; left: 3vh;
+      padding: 0.6vh 1.6vh;
+      border-radius: 0.6vh;
+      font-size: 2.6vh;
+      font-weight: 800;
+      letter-spacing: 0.3vh;
+      color: #fff;
+      text-transform: uppercase;
+      display: none;
+      z-index: 2;
+    }
+    #badge-live { background: rgba(0, 0, 0, 0.55); }
+    #badge-live::before {
+      content: "";
+      display: inline-block;
+      width: 1.6vh; height: 1.6vh;
+      margin-right: 1vh;
+      border-radius: 50%;
+      background: #e53935;
+      animation: blink 1.2s infinite;
+      vertical-align: 0.1vh;
+    }
+    #badge-replay { background: #e53935; }
+    body.live-ok:not(.on-replay) #badge-live { display: block; }
+    body.on-replay #badge-replay { display: block; }
+    @keyframes blink { 50% { opacity: 0.2; } }
+
+    /* Cortina entre el vivo y la repetición, como el corte de un canal deportivo */
+    #wipe {
+      position: absolute;
+      top: 0; left: -130%;
+      width: 130%; height: 100%;
+      background: linear-gradient(100deg, transparent 0 8%, #e53935 8% 20%, #111 20% 92%, transparent 92%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 9vh;
+      font-weight: 900;
+      font-style: italic;
+      letter-spacing: 1vh;
+      z-index: 3;
+      pointer-events: none;
+    }
+    #wipe.run { animation: wipe 900ms ease-in-out forwards; }
+    @keyframes wipe {
+      0%   { left: -130%; }
+      40%  { left: -15%; }
+      60%  { left: -15%; }
+      100% { left: 100%; }
+    }
+
+    /* Mensaje cuando todavía no hay imagen en vivo */
     #idle {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: rgba(255,255,255,0.25);
-      font-family: sans-serif;
-      font-size: 1.4rem;
-      letter-spacing: 3px;
+      color: rgba(255, 255, 255, 0.3);
+      font-size: 3vh;
+      letter-spacing: 0.4vh;
       text-transform: uppercase;
       text-align: center;
-      padding: 0 20px;
     }
+    #idle small {
+      margin-top: 2vh;
+      font-size: 2vh;
+      letter-spacing: 0.1vh;
+      text-transform: none;
+      max-width: 70%;
+    }
+    body.live-ok #idle, body.on-replay #idle { display: none; }
   </style>
 </head>
 <body>
-  <div id="idle">POOLAPPDELUXE<br />esperando repetición…</div>
-  <video id="player" playsinline autoplay></video>
+  <div id="idle">POOLAPPDELUXE<small id="idle-msg">Buscando la cámara…</small></div>
+  <video id="live" playsinline autoplay muted></video>
+  <video id="replay" playsinline></video>
+  <div id="badge-live" class="badge">En vivo</div>
+  <div id="badge-replay" class="badge">Repetición</div>
+  <div id="wipe">REPETICIÓN</div>
 
   <script>
-    const video = document.getElementById('player');
-    const idle = document.getElementById('idle');
-    let lastSeen = 0;
+    // Pantalla de la tele de la mesa:
+    //  - Muestra la cámara en vivo todo el tiempo. Toma la imagen de la "Cámara
+    //    virtual" de OBS (el agente la prende solo al conectarse), porque la
+    //    cámara física la tiene ocupada OBS y Windows no deja abrirla dos veces.
+    //  - Cuando el agente avisa que hay una repetición nueva, hace un corte con
+    //    cortina, la reproduce en esta misma ventana y vuelve sola al vivo.
+    //
+    // ?cam=texto elige otra cámara por nombre (por ejemplo ?cam=logitech).
+    const live = document.getElementById('live');
+    const replay = document.getElementById('replay');
+    const wipe = document.getElementById('wipe');
+    const idleMsg = document.getElementById('idle-msg');
+    const params = new URLSearchParams(location.search);
+    const wantedCam = (params.get('cam') || 'OBS Virtual Camera').toLowerCase();
+    const WIPE_SWAP_MS = 400; // momento en que la cortina tapa toda la pantalla
+
+    let lastSeen = null;
+    let liveStream = null;
+
+    // ---------- Vivo ----------
+
+    async function pickCameraId() {
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+      const match = devices.find((d) => d.label.toLowerCase().includes(wantedCam));
+      return { match, devices };
+    }
+
+    async function startLive() {
+      try {
+        // Sin permiso, el navegador no muestra los nombres de las cámaras. Un primer
+        // pedido sin elegir cámara sirve para pedir permiso; si la cámara por
+        // defecto es la física y la tiene OBS, falla con NotReadableError, pero el
+        // permiso ya quedó dado y los nombres aparecen igual.
+        const known = (await navigator.mediaDevices.enumerateDevices()).some((d) => d.kind === 'videoinput' && d.label);
+        if (!known) {
+          try {
+            const probe = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            probe.getTracks().forEach((t) => t.stop());
+          } catch (err) {
+            if (err.name === 'NotAllowedError') throw err;
+          }
+        }
+        const { match, devices } = await pickCameraId();
+        if (!match) {
+          const names = devices.map((d) => d.label || 'sin nombre').join(', ') || 'ninguna';
+          throw new Error(`No encuentro "${wantedCam}". Cámaras disponibles: ${names}. ¿Está prendida la cámara virtual de OBS?`);
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: { deviceId: { exact: match.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+        });
+        if (liveStream) liveStream.getTracks().forEach((t) => t.stop());
+        liveStream = stream;
+        live.srcObject = stream;
+        await live.play().catch(() => {});
+        document.body.classList.add('live-ok');
+        stream.getVideoTracks()[0].addEventListener('ended', () => {
+          // Se cerró OBS o se apagó la cámara virtual: reintenta hasta que vuelva.
+          document.body.classList.remove('live-ok');
+          idleMsg.textContent = 'Se cortó la imagen en vivo. Reintentando…';
+          liveStream = null;
+          setTimeout(startLive, 3000);
+        });
+      } catch (err) {
+        document.body.classList.remove('live-ok');
+        idleMsg.textContent = err.name === 'NotAllowedError'
+          ? 'El navegador no tiene permiso para usar la cámara. Permitilo en el candado de la barra de direcciones.'
+          : (err.message || String(err)) + ' Reintentando…';
+        setTimeout(startLive, 5000);
+      }
+    }
+
+    // ---------- Repetición ----------
+
+    function runWipe() {
+      wipe.classList.remove('run');
+      void wipe.offsetWidth; // reinicia la animación
+      wipe.classList.add('run');
+      return new Promise((resolve) => setTimeout(resolve, WIPE_SWAP_MS));
+    }
+
+    async function showReplay(stamp) {
+      await runWipe();
+      document.body.classList.add('on-replay');
+      replay.src = `/replay-latest.mp4?t=${stamp}`;
+      replay.muted = false;
+      replay.play().catch(() => {
+        // el navegador bloqueó el audio en autoplay: reintentamos muteado
+        replay.muted = true;
+        replay.play().catch(backToLive);
+      });
+    }
+
+    async function backToLive() {
+      if (!document.body.classList.contains('on-replay')) return;
+      await runWipe();
+      document.body.classList.remove('on-replay');
+      replay.pause();
+      replay.removeAttribute('src');
+      replay.load();
+    }
+
+    replay.addEventListener('ended', backToLive);
+    replay.addEventListener('error', () => {
+      if (replay.getAttribute('src')) backToLive();
+    });
 
     async function poll() {
       try {
         const res = await fetch('/status', { cache: 'no-store' });
         const data = await res.json();
-        if (data.lastUpdate && data.lastUpdate !== lastSeen) {
+        // La primera lectura solo registra la última repetición: al abrir la
+        // pantalla no se repite una jugada vieja.
+        if (lastSeen === null) lastSeen = data.lastUpdate || 0;
+        else if (data.lastUpdate && data.lastUpdate !== lastSeen) {
           lastSeen = data.lastUpdate;
-          idle.style.display = 'none';
-          video.src = `/replay-latest.mp4?t=${lastSeen}`;
-          video.muted = false;
-          video.play().catch(() => {
-            // el navegador bloqueó el audio en autoplay — reintentamos muteado
-            video.muted = true;
-            video.play();
-          });
+          showReplay(lastSeen);
         }
       } catch (e) {
-        // silencioso — sigue intentando cada segundo
+        // silencioso: sigue intentando cada segundo
       }
       setTimeout(poll, 1000);
     }
+
+    startLive();
     poll();
   </script>
 </body>

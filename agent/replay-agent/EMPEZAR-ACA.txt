@@ -27,11 +27,10 @@ PASOS (una sola vez):
 3. En OBS (con la camara de la mesa ya agregada a una escena):
    - Configuracion -> Salida -> pestaña "Buffer de repeticion" -> activarlo,
      Tiempo maximo de repeticion = 60 segundos.
-   - Iniciar el buffer (deberia haber un boton "Iniciar buffer de
-     repeticion" en la ventana principal).
    - Herramientas -> "WebSocket Server Settings" -> activar el servidor.
      Anotar el puerto (por defecto 4455) y la contraseña si le pusiste una.
-   - Apretar "Iniciar Camara Virtual".
+   - El buffer y la camara virtual los prende solo el agente (paso 5).
+     La camara virtual es de donde la tele toma la imagen en vivo.
 
 4. En esta carpeta: copiar el archivo ".env.example", renombrar la copia a
    ".env", y abrirlo con el Bloc de notas. Completar:
@@ -47,19 +46,20 @@ PASOS (una sola vez):
    La primera vez va a tardar un par de minutos instalando. Dejar esa
    ventana negra abierta — mientras este abierta, el sistema funciona.
 
-6. En el navegador de esta PC (la que esta conectada a la tele por HDMI),
-   abrir:
+6. La pantalla de la tele se abre sola a pantalla completa (Chrome o Edge)
+   y muestra la mesa EN VIVO. Para salir de la pantalla completa: Alt+F4.
+   Si no se abre, abrir a mano en el navegador de esta PC:
        http://localhost:5051/replay-display.html
    y poner pantalla completa (F11).
 
 LISTO. Para probar: desde el celu, entra a la partida (por el link de
-Vercel o escaneando el QR) y toca un boton de repeticion. Deberia aparecer
-en la tele en unos segundos.
+Vercel o escaneando el QR) y toca un boton de repeticion. En unos segundos
+la tele corta a la repeticion y despues vuelve sola al vivo.
 
 Si algo falla, el mensaje de error va a aparecer en la ventana negra del
 paso 5 — copialo y mandaselo a Claude para resolverlo (README.md de esta
 carpeta tiene mas detalle de los problemas mas comunes).
 
-PARA LA PROXIMA VEZ que uses esta misma PC/mesa: solo hace falta el paso 5
-y el paso 6 — todo lo demas (instalar, configurar OBS, el .env) ya queda
+PARA LA PROXIMA VEZ que uses esta misma PC/mesa: abrir OBS y hacer el
+paso 5 — todo lo demas (instalar, configurar OBS, el .env) ya queda
 guardado.

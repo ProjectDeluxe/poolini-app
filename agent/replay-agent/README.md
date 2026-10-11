@@ -6,7 +6,7 @@ Esto corre en la PC que tiene la cámara y OBS conectados a la mesa de pool — 
 
 1. Abrí OBS con la cámara de la mesa ya agregada como fuente en una escena.
 2. **Activar el Replay Buffer:** Configuración → Salida → pestaña "Buffer de repetición". Activalo, y poné el "Tiempo máximo de repetición" en **60 segundos** (así cubre los tres botones — 20s/40s/1min — recortando después). Aplicá.
-3. Iniciá el buffer: en la ventana principal de OBS debería aparecer el botón "Iniciar buffer de repetición" (si no lo ves, Ver → Docks → "Controles de escena" o similar). Tiene que estar corriendo para que esto funcione.
+3. No hace falta iniciar a mano ni el buffer ni la cámara virtual: el agente los prende solo al conectarse a OBS. La cámara virtual (OBS 26.1 o más nuevo) es de donde la tele toma la imagen en vivo, porque la cámara física ya la tiene ocupada OBS.
 4. **Activar el WebSocket:** Herramientas → "WebSocket Server Settings" (o "Configuración del servidor WebSocket"). Activá el servidor. Anotá el puerto (por defecto `4455`) y, si le pusiste contraseña, anotala también — van al `.env`.
 
 ## 2. Preparar esta carpeta en esa PC
@@ -41,20 +41,20 @@ Supabase Realtime: SUBSCRIBED
 
 ## 4. La tele
 
-En el navegador de esa misma PC (la que está conectada a la tele por HDMI), abrí:
+En Windows el agente abre solo la pantalla de la tele en Chrome (o Edge) a pantalla completa, con un perfil propio que ya tiene permiso para la cámara y para reproducir con sonido. Para salir de la pantalla completa: Alt+F4. Si la tele es una segunda pantalla, poné su posición en `TELE_POSICION` (por ejemplo `1920,0`); si preferís abrirla a mano, `ABRIR_TELE=0` y abrí:
 
 ```
 http://localhost:5051/replay-display.html
 ```
 
-y poné el navegador en pantalla completa (F11). Al principio dice "esperando repetición…" — es normal, todavía no se pidió ninguna.
+La pantalla muestra la mesa **en vivo** todo el tiempo, con la etiqueta "EN VIVO". Cuando alguien pide una repetición, hace un corte con cortina, pasa la repetición ahí mismo con la etiqueta "REPETICIÓN" y, al terminar, vuelve sola al vivo. Si no encuentra la cámara virtual, lo dice en pantalla y reintenta cada 5 segundos. Para usar otra cámara, agregá `?cam=` y parte de su nombre a la dirección (por ejemplo `?cam=logitech`).
 
 ## 5. Probarlo desde el celu
 
 1. Abrí una partida en PoolAppDeluxe, entrá al control desde el celu (como ya venís haciendo con el QR).
 2. Tocá cualquiera de los tres botones de repetición (20s / 40s / 1min).
 3. En la terminal donde corre `npm start` deberías ver los logs del pedido llegando y a OBS guardando el buffer.
-4. En la tele, la página debería actualizarse sola y reproducir la repetición en unos segundos.
+4. En la tele, en unos segundos, el vivo corta a la repetición y después vuelve solo al vivo.
 
 ## 6. Guardar un clip en el perfil (Fase 2)
 
@@ -69,7 +69,8 @@ El clip se sube en 720p y algo más comprimido que la repetición de la tele, pa
 
 ## Si algo no funciona
 
-- **"OBS no pudo guardar el Replay Buffer"** → el buffer no está iniciado en OBS (paso 1.3), o el WebSocket está desactivado/con otro puerto o contraseña distinta a la del `.env`.
+- **"OBS no pudo guardar el Replay Buffer"** → el buffer no está activado en Configuración → Salida (paso 1.2), o el WebSocket está desactivado/con otro puerto o contraseña distinta a la del `.env`.
+- **La tele dice "No encuentro obs virtual camera"** → la cámara virtual de OBS no está prendida. El agente intenta prenderla solo; si en la ventana negra aparece "No pude iniciar la cámara virtual", apretá "Iniciar cámara virtual" en OBS. Si la tele muestra el vivo en negro, revisá que el Modo de Estudio esté apagado (la cámara virtual saca el Programa, no la Vista Previa).
 - **Se conecta a Supabase pero nunca llega el comando** → revisá que el celu y esta PC compartan el mismo proyecto de Supabase (misma `SUPABASE_URL`), y que estés tocando el botón en la partida correcta.
 - **"No pude crear el clip en la base"** → falta correr la migración de la Fase 2 (paso 6.1).
 - **El agente arranca pero no reacciona a ningún botón** → si pusiste `TABLE_ID`, la partida tiene que estar creada en esa mesa (en "Nueva partida", elegí la mesa en vez de "Sin mesa"). Las partidas sueltas se ignoran cuando hay `TABLE_ID`.

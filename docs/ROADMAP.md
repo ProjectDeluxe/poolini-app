@@ -1,7 +1,9 @@
 # PoolAppDeluxe — Roadmap y arquitectura (v1)
 
-Documento vivo. Última actualización: 2026-10-08 (Fase 3, cuentas), a partir de la revisión del código existente y la definición de producto con Agus.
+Documento vivo. Última actualización: 2026-10-11 (Fase 3, vivo + repetición en la tele), a partir de la revisión del código existente y la definición de producto con Agus.
 
+> **Actualización 2026-10-11:** antes de pasar a la Fase 4, Agus pidió dos bloques más de Fase 3. (1) La tele de la mesa muestra la cámara **en vivo** todo el tiempo y la repetición aparece en esa misma pantalla, con un corte tipo canal deportivo, y vuelve sola al vivo; es lo que bloquea salir a probar y ya está hecho en el agente (sección 6.5). (2) Cuentas de club autogestionadas: cualquier cuenta real crea su club, el dueño suma gente, carga de partidos ya jugados sin mesa y RLS de `matches` acotada (sección 6.6, en curso). El backlog que dejó Agus está en 6.7. Fase 3 cuentas en main desde `cb0a269`, con las dos migraciones corridas en producción.
+>
 > **Actualización 2026-10-08:** antes de seguir con el cobro, se define el modelo de cuentas: club, jugador e invitado sobre un solo sistema de permisos. Implementado en código (migración, mesas abiertas con QR fijo, reclamo de jugador por celu con confirmación, panel del club) — ver sección 6.4. Planes y límites (6.3) en main desde el commit `5787987`.
 >
 > **Actualización 2026-10-08:** dos ajustes de UI fuera de las fases. Se sacó la pantalla de inicio (repetía los accesos de la barra lateral) y `/` ahora lleva a 📊 Historial; cuando exista "mi jugador" (modelo de cuentas, 6.4) se puede reconsiderar llevar al perfil propio. Además, 🔍 en la barra busca jugadores por nombre (sin distinguir mayúsculas) y lleva a su perfil. La búsqueda de clubs queda afuera a propósito: no hay todavía una página pública de club a la que llevar.
@@ -41,7 +43,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 | Modelo de negocio | Híbrido: jugar es gratis siempre; descargar/guardar clips requiere suscripción a partir de cierto uso; el club paga una mensualidad por mesa con instalación bonificada |
 | Qué limita la suscripción | Cantidad/duración de clips guardados **y** publicar/compartir públicamente. Propuesta de arranque: plan free = 1 clip corto guardado por mes, y va creciendo con el nivel de suscripción |
 | Prioridad actual | Diseñar la arquitectura completa antes de escribir código nuevo |
-| Repetición en tele | Feature opcional por club: tele por mesa que muestra la repetición de la última jugada bajo pedido (no una transmisión en vivo continua) — delay de un par de segundos es aceptable |
+| Repetición en tele | Feature opcional por club: tele por mesa que muestra la mesa en vivo todo el tiempo y, bajo pedido, la repetición de la última jugada en esa misma pantalla, volviendo sola al vivo (redefinido 2026-10-11, ver 6.5) — delay de un par de segundos en la repetición es aceptable |
 | Cámara | Fija, cenital (desde arriba), siempre encuadrando la mesa — sin zoom ni movimiento |
 | Hardware sugerido | Mini-PC tipo Intel N100 (no Raspberry Pi) por el decodificador/codificador de video por hardware — necesario porque el mismo equipo tiene que mostrar el video en vivo, mantener el buffer para clips, y codificar/subir clips a demanda |
 | Expansión a otros deportes | Vender una **app personalizada por cliente/club** (no un SaaS multi-tenant único) — cada deporte/club es esencialmente una instancia propia derivada de la misma base de código |
@@ -118,6 +120,8 @@ Además, se sacó el botón de "guardar clip" del control del celu: por ahora la
 ### 5.1 Repetición en la tele (por mesa, opcional para el club)
 
 **Redefinido:** no es una transmisión en vivo continua — Agus aclaró que el objetivo real es poder ver la repetición de una jugada, no mirar la mesa como si fuera un stream. Esto simplifica el diseño y confirma que un delay de un par de segundos es aceptable.
+
+**Redefinido otra vez (2026-10-11):** la tele sí muestra la cámara en vivo todo el tiempo mientras graba, y la repetición entra en esa misma pantalla como el corte de un canal deportivo, volviendo sola al vivo. Sigue sin ser un stream a internet: el vivo es local, de la PC de la mesa a su tele. Cómo se hizo: sección 6.5.
 
 - **Cámara cenital fija**, siempre encuadrando la mesa desde arriba. Sin zoom ni movimiento (nada de PTZ) — más simple y barata, y de paso todos los clips quedan con el mismo encuadre consistente, lo cual ayuda a que se vean prolijos si después se publican.
 - **Flujo de repetición**: el mini-PC mantiene el buffer rotativo local (el mismo que ya se necesita para los clips). Desde el control del celu, un botón "repetición" manda un comando `mark_moment` por Realtime (hoy definido en el schema pero sin usar) — distinto de `save_clip`. El mini-PC reacciona reproduciendo en la tele los últimos N segundos del buffer, una vez, sin necesariamente subirlo a storage. Si el jugador después quiere guardarlo, ahí sí dispara `save_clip`.
@@ -276,9 +280,37 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 - Si se vuelve a correr la migración de planes, hay que correr después la de cuentas: la de planes reescribe el control de clips sin la regla de invitados.
 
 **Pendiente para cerrar esta parte:**
-- Correr en producción, en orden: `2026-10-07-fase3-planes.sql` y después `2026-10-07-fase3-cuentas.sql`. Después, marcarse admin con el `UPDATE profiles …` que está en el encabezado de la migración. **Sin ese paso, Agus pierde el acceso a 🏢 y a crear jugadores.**
+- ~~Correr en producción las dos migraciones y marcarse admin~~ → hecho el 2026-10-08 (Agus lo chequeó en el SQL Editor). Código en main desde `cb0a269`.
 - Supabase → Authentication → Sign In / Providers: activar **Anonymous sign-ins** (viene apagado). Activar también el CAPTCHA de Auth antes de abrir mesas en un club real: hoy el único freno a crear sesiones anónimas en loop es el límite por IP que trae Supabase (pedido de Agus: anotar el rate-limit para cuando haya mesas reales).
 - Prueba real: abrir una mesa, escanear el QR desde otro celu como invitado, jugar y terminar (la mesa vuelve a "abierta"). Después cargar un jugador de club con un celu y entrar con ese celu para confirmar el reclamo.
+
+### 6.5 Fase 3 — vivo continuo y repetición en la misma pantalla (2026-10-11)
+
+**Pedido de Agus:** hasta acá la tele mostraba "esperando repetición…" y la cámara grababa en segundo plano sin mostrar nada. Ahora la cámara se ve en vivo todo el tiempo, y al pedir una repetición aparece en esa misma ventana, como el corte de un canal deportivo, y vuelve sola al vivo. Es lo que bloqueaba salir a probar.
+
+**Cómo se hizo (todo en `agent/replay-agent/`, no toca la app ni la base):**
+- **De dónde sale el vivo:** la cámara física ya la tiene abierta OBS y en Windows una cámara no se puede abrir dos veces. Por eso la tele toma la imagen de la **cámara virtual de OBS** (viene con OBS desde la 26.1), que además muestra exactamente lo que OBS graba. Al conectarse a OBS, el agente prende solo el buffer de repetición y la cámara virtual si estaban apagados.
+- **`replay-display.html`:** la cámara virtual de fondo con la etiqueta "EN VIVO". Cuando el agente avisa que hay una repetición nueva, pasa una cortina con "REPETICIÓN", reproduce el recorte en la misma pantalla con su etiqueta y, al terminar, otra cortina y vuelve al vivo. Si llega otra repetición mientras pasa una, corta a la nueva. Si no encuentra la cámara virtual, lo dice en pantalla y reintenta cada 5 s; si se cierra OBS, vuelve sola cuando OBS vuelve. `?cam=nombre` elige otra cámara.
+- **La ventana de la tele se abre sola:** en Windows el agente abre esa página en Chrome o Edge a pantalla completa (modo kiosco), con un perfil propio que ya tiene permiso de cámara y de reproducir con sonido, así no hay que tocar nada en la tele. `ABRIR_TELE=0` lo desactiva y `TELE_POSICION` la manda a una segunda pantalla.
+- Probado en un navegador headless con una cámara falsa: el vivo se ve, al llegar una repetición corta a ella y al terminar vuelve al vivo. Falta la prueba real con OBS en la PC de la mesa.
+
+**Lo que hay que saber en la PC de la mesa:**
+- Para que la tele tome lo nuevo hay que cerrar el agente y la pestaña vieja de la tele, y volver a abrir `iniciar-agente.bat`.
+- El Modo de Estudio de OBS tiene que seguir apagado (ver 3.1): la cámara virtual saca el Programa, no la Vista Previa.
+
+### 6.6 Fase 3 — cuentas de club autogestionadas (2026-10-11, en curso)
+
+Pedido de Agus: que cualquier cuenta real (no invitado) cree su club y quede como dueño; que el dueño, además del admin, pueda sumar gente por celu; cargar partidos ya jugados sin mesa ni cámara; y reemplazar la política `auth_write_all` de `matches`, que nunca se ajustó, por una acotada al club del partido. Se documenta al terminar.
+
+### 6.7 Backlog (pedido de Agus, no bloquea)
+
+- Login con Google.
+- Que un jugador sea socio de más de un club (hoy `players.club_id` es uno solo).
+- Modo "mesa sin cámara".
+- Reclamo de perfil con aprobación del club (hoy el reclamo por celu se confirma solo con el OTP y el "¿sos vos?").
+- Cartelería y consentimiento legal para clubes reales (se filma a la gente).
+- Vista de todas las mesas desde una PC maestra.
+- Edición automática con IA del partido completo.
 
 **Fase 4 — Publicar y compartir.** Feed o galería de clips públicos, compartir por link, descarga habilitada según plan.
 
@@ -286,7 +318,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-08:** Fases 1 y 2 cerradas. Fase 3 en curso: planes y límites en main (6.3); modelo de cuentas hecho en código (6.4). Falta correr las dos migraciones en producción y probar; después, elegir proveedor de pago, poner precios y sumar el cobro encima de este modelo.
+**Actualizado 2026-10-11:** Fases 1 y 2 cerradas. Fase 3 en curso: planes y límites (6.3) y modelo de cuentas (6.4) en main y en producción. Vivo + repetición en la misma pantalla hecho en el agente (6.5), falta probarlo con OBS en la mesa. Sigue el bloque de cuentas de club autogestionadas (6.6). Después: elegir proveedor de pago, poner precios y sumar el cobro encima de este modelo.
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 
