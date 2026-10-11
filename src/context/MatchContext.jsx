@@ -36,6 +36,7 @@ export function MatchProvider({ children }) {
         loading,
         startMatch,
         finishMatch,
+        reloadMatches: loadMatches,
       }}
     >
       {children}

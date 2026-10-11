@@ -29,7 +29,8 @@
 }
 
 .club-form input,
-.table-form input {
+.table-form input,
+.table-form select {
   flex: 1 1 180px;
   padding: 10px 12px;
   background: rgba(255,255,255,0.08);
@@ -141,4 +142,16 @@
   font-size: 0.7rem;
   word-break: break-all;
   color: rgba(255,255,255,0.7);
+}
+
+.table-form select {
+  flex: 0 1 auto;
+}
+
+.log-match-form input[type="number"] {
+  flex: 0 1 90px;
+}
+
+.log-match-form select {
+  flex: 1 1 140px;
 }

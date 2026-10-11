@@ -53,8 +53,34 @@ export async function startMatchAtTable(token, player1Id, player2Id) {
   return data;
 }
 
-// Admin: darle a alguien la cuenta de un club por su celu
-export async function addClubMemberByPhone(clubId, phone) {
-  const { error } = await supabase.rpc("add_club_member_by_phone", { cid: clubId, member_phone: phone });
+// Darle a alguien acceso a un club por su celu (admin o dueño del club).
+// role: 'owner' (dueño) | 'staff'
+export async function addClubMemberByPhone(clubId, phone, role = "owner") {
+  const { error } = await supabase.rpc("add_club_member_by_phone", { cid: clubId, member_phone: phone, member_role: role });
   if (error) throw error;
+}
+
+// Cualquier cuenta real crea su club y queda como dueño (ROADMAP 6.6)
+export async function createMyClub({ name, address = null, contact = null }) {
+  const { data, error } = await supabase.rpc("create_my_club", {
+    club_name: name,
+    club_address: address,
+    club_contact: contact,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Partido ya jugado, sin mesa ni cámara. Sin ganador, gana el de más puntos.
+export async function logMatchResult({ clubId, player1Id, player2Id, score1, score2, winnerId = null }) {
+  const { data, error } = await supabase.rpc("log_match_result", {
+    club_id: clubId,
+    p1: player1Id,
+    p2: player2Id,
+    score1,
+    score2,
+    winner_id: winnerId,
+  });
+  if (error) throw error;
+  return data;
 }

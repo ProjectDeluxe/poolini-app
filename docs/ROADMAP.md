@@ -2,7 +2,7 @@
 
 Documento vivo. Última actualización: 2026-10-11 (Fase 3, vivo + repetición en la tele), a partir de la revisión del código existente y la definición de producto con Agus.
 
-> **Actualización 2026-10-11:** antes de pasar a la Fase 4, Agus pidió dos bloques más de Fase 3. (1) La tele de la mesa muestra la cámara **en vivo** todo el tiempo y la repetición aparece en esa misma pantalla, con un corte tipo canal deportivo, y vuelve sola al vivo; es lo que bloquea salir a probar y ya está hecho en el agente (sección 6.5). (2) Cuentas de club autogestionadas: cualquier cuenta real crea su club, el dueño suma gente, carga de partidos ya jugados sin mesa y RLS de `matches` acotada (sección 6.6, en curso). El backlog que dejó Agus está en 6.7. Fase 3 cuentas en main desde `cb0a269`, con las dos migraciones corridas en producción.
+> **Actualización 2026-10-11:** antes de pasar a la Fase 4, Agus pidió dos bloques más de Fase 3. (1) La tele de la mesa muestra la cámara **en vivo** todo el tiempo y la repetición aparece en esa misma pantalla, con un corte tipo canal deportivo, y vuelve sola al vivo; es lo que bloquea salir a probar y ya está hecho en el agente (sección 6.5). (2) Cuentas de club autogestionadas: cualquier cuenta real crea su club, el dueño suma gente, carga de partidos ya jugados sin mesa y RLS de `matches` acotada (sección 6.6; migración nueva a correr en producción antes del push). El backlog que dejó Agus está en 6.7. Fase 3 cuentas en main desde `cb0a269`, con las dos migraciones corridas en producción.
 >
 > **Actualización 2026-10-08:** antes de seguir con el cobro, se define el modelo de cuentas: club, jugador e invitado sobre un solo sistema de permisos. Implementado en código (migración, mesas abiertas con QR fijo, reclamo de jugador por celu con confirmación, panel del club) — ver sección 6.4. Planes y límites (6.3) en main desde el commit `5787987`.
 >
@@ -68,7 +68,7 @@ La ambición de fondo no se limita al pool: la misma idea (cámara fija sobre el
 - ~~No existe el concepto de club ni de mesa en el modelo de datos~~ → resuelto en la Fase 1 (2026-10-07, ver 6.1). Las partidas pueden seguir siendo "sueltas" (sin mesa) a propósito.
 - No hay cobro online integrado. Desde la Fase 3 (ver 6.3) existen los planes y sus límites; el plan pago se activa a mano mientras no haya proveedor de pago.
 
-**Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS eran permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema); desde la Fase 3 ya no lo son en `players`, `clubs`, `tables`, `clips` y `realtime_commands`, y siguen abiertas `matches` e `interactions` (Fase 5).
+**Deuda técnica menor:** `src/storage/jugadores.js` es código muerto (versión vieja con localStorage, previa a Supabase). Varios `console.log` de debug en `PlayerService.js` y `NuevoJugador.jsx`. Falta validar que Jugador 1 ≠ Jugador 2 al crear partida. Las políticas RLS eran permisivas a propósito para el MVP ("se endurece en v2", según el propio comentario del schema); desde la Fase 3 ya no lo son en `players`, `clubs`, `tables`, `clips`, `realtime_commands` y `matches` (2026-10-11, ver 6.6), y sigue abierta `interactions` (Fase 5).
 
 ### 3.1 Lo que se encontró y se arregló en la primera puesta en marcha real (2026-10-06)
 
@@ -275,7 +275,7 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
   - Un invitado que después entra con su celu convierte la misma sesión en cuenta (`updateUser` + OTP `phone_change`). Si ese celu ya tenía cuenta, entra a la existente.
 
 **Decisiones tomadas en el camino (cambiables):**
-- Las partidas siguen pudiendo crearse "a mano" por cualquier logueado (`NuevaPartida`); la RLS de `matches` queda abierta hasta la Fase 5.
+- Las partidas siguen pudiendo crearse "a mano" por cualquier logueado (`NuevaPartida`); ~~la RLS de `matches` queda abierta hasta la Fase 5~~ → acotada el 2026-10-11 (ver 6.6).
 - Un jugador con cuenta no puede borrar su jugador (solo admin), para no romper historial ajeno.
 - Si se vuelve a correr la migración de planes, hay que correr después la de cuentas: la de planes reescribe el control de clips sin la regla de invitados.
 
@@ -298,9 +298,34 @@ Esto depende de cosas que todavía no existen (login/panel de club, Fase 1 del m
 - Para que la tele tome lo nuevo hay que cerrar el agente y la pestaña vieja de la tele, y volver a abrir `iniciar-agente.bat`.
 - El Modo de Estudio de OBS tiene que seguir apagado (ver 3.1): la cámara virtual saca el Programa, no la Vista Previa.
 
-### 6.6 Fase 3 — cuentas de club autogestionadas (2026-10-11, en curso)
+### 6.6 Fase 3 — cuentas de club autogestionadas (2026-10-11)
 
-Pedido de Agus: que cualquier cuenta real (no invitado) cree su club y quede como dueño; que el dueño, además del admin, pueda sumar gente por celu; cargar partidos ya jugados sin mesa ni cámara; y reemplazar la política `auth_write_all` de `matches`, que nunca se ajustó, por una acotada al club del partido. Se documenta al terminar.
+**Pedido de Agus:** hasta acá solo el admin creaba clubs y decía quién los maneja. Pasa a ser autogestionado: cualquier cuenta real (no invitado) crea su club y queda como dueña; el dueño, además del admin, suma gente por celu; se pueden cargar partidos ya jugados sin mesa ni cámara; y `matches` deja la política `auth_write_all` (cualquier logueado escribe cualquier cosa), que nunca se había ajustado.
+
+**Hecho en código:**
+- `supabase/migrations/2026-10-11-fase3-clubs-autogestionados.sql` (idempotente; probada dos veces sobre una base tipo producción y sobre una desde cero, y con los permisos de cada rol):
+  - `create_my_club(nombre, dirección, contacto)`: crea el club y la membresía de dueño en la misma transacción. Rechaza invitados.
+  - `is_club_owner(club)` y `add_club_member_by_phone` abierta al dueño de ese club, con rol dueño o staff.
+  - `log_match_result(club_id, p1, p2, score1, score2, winner_id, played_at)`: partido `finished` sin mesa. Solo miembros del club o admin, y los dos jugadores tienen que ser del club. Sin ganador gana el de más puntos; con empate hay que indicarlo. `played_at` es opcional, para cargar un partido de otro día.
+  - `matches.created_by`, que lo pone la base. Un trigger toma el club de la mesa y no deja que nadie salvo el admin cambie el club, la mesa o el creador de una partida.
+  - RLS nueva de `matches`. Borra **todas** las políticas que tenga la tabla, porque en producción hubo políticas cargadas a mano con nombres desconocidos (3.1), y crea:
+    - leer: cualquier logueado, como antes;
+    - crear: partida suelta cualquiera; en un club, sus miembros o el admin;
+    - editar: admin, miembros del club, quien la creó o uno de los dos jugadores;
+    - borrar: admin o miembros del club.
+- `supabase-schema.sql` v1.5 con lo mismo.
+- App:
+  - 🏢 aparece para cualquier cuenta con celu. Sin club, la pantalla invita a crear uno.
+  - El dueño ve "Dar acceso" (dueño o staff).
+  - Cada club tiene "Cargar partido jugado" con sus jugadores, y pide el ganador si hay empate.
+  - En Nueva partida solo se ofrecen las mesas de tus clubs.
+
+**Decisiones tomadas en el camino (cambiables):**
+- **Quién edita una partida:** Agus pidió escritura "solo para miembros del club de ese partido o admin, mismo criterio que `players`/`tables`". Tomado literal, el invitado que arranca una partida por el QR no podría mover su marcador, y una partida suelta solo la tocaría el admin. Por eso, igual que en `players` (donde edita el dueño y quien creó al invitado), también editan quien creó la partida y los dos jugadores si tienen cuenta. Borrar sí queda solo para el club y el admin.
+- **Jugadores "del club":** son los que tienen `players.club_id` de ese club. Un jugador que se registró solo (sin club) no entra en `log_match_result` hasta que exista lo de "socio de más de un club" (backlog, 6.7).
+- Si alguien escanea el QR de una partida suelta ajena con su propia cuenta, no puede mover el marcador salvo que sea uno de los dos jugadores.
+
+**Pendiente:** correr la migración en producción **antes** del push (el código nuevo llama a `create_my_club` y `log_match_result`). Prueba real: crear un club con una cuenta que no sea admin, darle acceso a otro celu como staff, cargar un partido jugado y arrancar una partida por QR como invitado para confirmar que el marcador se mueve.
 
 ### 6.7 Backlog (pedido de Agus, no bloquea)
 
@@ -318,7 +343,7 @@ Pedido de Agus: que cualquier cuenta real (no invitado) cree su club y quede com
 
 ## 7. Próximo paso concreto
 
-**Actualizado 2026-10-11:** Fases 1 y 2 cerradas. Fase 3 en curso: planes y límites (6.3) y modelo de cuentas (6.4) en main y en producción. Vivo + repetición en la misma pantalla hecho en el agente (6.5), falta probarlo con OBS en la mesa. Sigue el bloque de cuentas de club autogestionadas (6.6). Después: elegir proveedor de pago, poner precios y sumar el cobro encima de este modelo.
+**Actualizado 2026-10-11:** Fases 1 y 2 cerradas. Fase 3 en curso: planes y límites (6.3) y modelo de cuentas (6.4) en main y en producción. Vivo + repetición en la misma pantalla hecho en el agente (6.5), falta probarlo con OBS en la mesa. Cuentas de club autogestionadas hechas en código (6.6), falta correr su migración en producción. Después: elegir proveedor de pago, poner precios y sumar el cobro encima de este modelo.
 
 ## 8. Expansión a otros deportes (tenis y lo que siga)
 

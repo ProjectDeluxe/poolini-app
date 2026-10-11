@@ -2,12 +2,18 @@ import { useEffect, useState } from "react";
 import { usePlayers } from "../context/PlayerContext";
 import { useMatches } from "../context/MatchContext";
 import { getTables } from "../services/ClubService";
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 export default function NuevaPartida() {
   const { players } = usePlayers();
   const { startMatch } = useMatches();
-  const [tables, setTables] = useState([]);
+  const { account } = useAuth();
+  const [allTables, setTables] = useState([]);
+  // Partidas en mesa: solo en las de tus clubs (o todas si sos admin). En una
+  // mesa de otro club se arranca escaneando su QR.
+  const myClubIds = (account?.clubs ?? []).map((c) => c.id);
+  const tables = account?.is_admin ? allTables : allTables.filter((t) => myClubIds.includes(t.club_id));
   const [p1, setP1] = useState("");
   const [p2, setP2] = useState("");
   const [tableId, setTableId] = useState(""); // "" = partida suelta, sin mesa

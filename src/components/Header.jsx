@@ -5,7 +5,8 @@ import "./Header.css";
 
 export default function Header() {
   const { user, account, signOut } = useAuth();
-  const managesClubs = !!account?.is_admin || (account?.clubs ?? []).length > 0;
+  // 🏢 para cualquier cuenta real: ahí también se crea el club propio
+  const showClubs = !!account && !account.is_anonymous;
   const navigate = useNavigate();
 
   async function handleSignOut() {
@@ -23,7 +24,7 @@ export default function Header() {
         <Link to="/historial" className="icon-btn" title="Historial">📊</Link>
         <Link to="/jugadores" className="icon-btn" title="Jugadores">👤</Link>
         {user && <PlayerSearch />}
-        {managesClubs && <Link to="/clubs" className="icon-btn" title="Clubs y mesas">🏢</Link>}
+        {showClubs && <Link to="/clubs" className="icon-btn" title="Clubs y mesas">🏢</Link>}
         <Link to="/plan" className="icon-btn" title="Mi plan">💳</Link>
       </nav>
 
